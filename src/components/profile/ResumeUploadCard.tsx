@@ -34,7 +34,7 @@ interface ResumeUploadCardProps {
 
 /**
  * Resume upload card shared by the mentee and mentor profile pages.
- * Visual style adapted from mentorle's mentee profile, themed to Edubrige.
+ * Visual style adapted from mentorle's mentee profile, themed to Mentorle.
  */
 const ResumeUploadCard = ({
   hasResume,

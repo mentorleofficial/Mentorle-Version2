@@ -1,5 +1,5 @@
 
-[1m[30m[46m RUN [49m[39m[22m [36mv4.1.8 [39m[90mC:/Programming/BeezTech/Edubrige[39m
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.8 [39m[90mC:/Programming/BeezTech/Mentorle[39m
 
 [90mstdout[2m | src/test/FeedbackInbox.test.tsx[2m > [22m[2mFeedbackInbox Page[2m > [22m[2mshould parse feedback comment, hide survey text from inbox, and show View Survey details popup on click
 [22m[39mMock Dialog rendered. Open prop is: [33mfalse[39m

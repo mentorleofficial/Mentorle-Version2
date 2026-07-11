@@ -30,6 +30,7 @@ const MentorProgramDetail = lazy(() => import("@/pages/MentorProgramDetail"));
 const MenteePrograms = lazy(() => import("@/pages/MenteePrograms"));
 const MenteeProgramDetail = lazy(() => import("@/pages/MenteeProgramDetail"));
 const MentorLanding = lazy(() => import("@/pages/MentorLanding"));
+const MenteeLanding = lazy(() => import("@/pages/MenteeLanding"));
 const MentorDirectory = lazy(() => import("@/pages/MentorDirectory"));
 const MentorProfile = lazy(() => import("@/pages/MentorProfile"));
 const MentorOfferings = lazy(() => import("@/pages/MentorOfferings"));
@@ -77,6 +78,7 @@ const App = () => (
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/become-a-mentor" element={<MentorLanding />} />
+                  <Route path="/signup" element={<MenteeLanding />} />
                   <Route path="/mentors/:mentorId" element={<PublicMentorProfile />} />
                   <Route path="/auth/jwt/callback" element={<JwtCallback />} />
                   <Route path="/admin/applications" element={<RoleGuard allowedRoles={["admin"]}><AdminApplications /></RoleGuard>} />

@@ -107,6 +107,12 @@ const Login = () => {
             <span className="font-medium text-primary">EduBridge</span>
           </p> */}
           <p className="mt-2 text-center text-sm text-muted-foreground">
+            New here?{" "}
+            <a href="/signup" className="font-medium text-primary hover:underline">
+              Create an account
+            </a>
+          </p>
+          <p className="mt-1 text-center text-sm text-muted-foreground">
             Want to mentor?{" "}
             <a href="/become-a-mentor" className="font-medium text-primary hover:underline">
               Apply here

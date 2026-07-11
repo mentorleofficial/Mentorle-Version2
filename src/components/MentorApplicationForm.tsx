@@ -35,6 +35,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getResumeSignedUrl } from "@/features/mentor-profile/api/mentorProfile";
+import { PhoneInput } from "@/components/ui/phone-input";
+import { phoneSchema } from "@/features/mentor-profile/schema";
 
 const urlOrEmpty = z
   .string()
@@ -49,15 +51,13 @@ const urlOrEmpty = z
   })
   .pipe(z.string().url("Must be a valid URL").or(z.literal("")));
 
-const phoneRegex = /^[+\d][\d\s\-().]{6,19}$/;
-
 const schema = z
   .object({
     full_name: z.string().trim().min(2, "Required").max(100)
       .refine((v) => !["admin", "mentor", "mentee"].includes(v.toLowerCase()), "Please enter your real name"),
     email: z.string().trim().email("Invalid email").max(255),
     password: z.string().min(8, "Password must be at least 8 characters").max(72),
-    phone: z.string().trim().regex(phoneRegex, "Enter a valid phone number").or(z.literal("")),
+    phone: phoneSchema.or(z.literal("")),
     linkedin_url: urlOrEmpty.refine(
       (v) => !v || /linkedin\.com\/(in|pub)\//i.test(v),
       "Must be a linkedin.com/in/… or /pub/… URL"
@@ -742,16 +742,15 @@ const MentorApplicationForm = ({ onComplete }: Props) => {
               </div>
               <div className="space-y-1.5">
                 <Label>Phone</Label>
-                <Input
-                  type="tel"
-                  inputMode="numeric"
-                  placeholder="+1 555 123 4567"
-                  {...form.register("phone")}
-                  onInput={(e) => {
-                    const el = e.currentTarget;
-                    const cleaned = el.value.replace(/[^0-9+\-\s().]/g, "");
-                    if (cleaned !== el.value) el.value = cleaned;
-                  }}
+                <Controller
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <PhoneInput
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  )}
                 />
                 {errs.phone && <p className="text-xs text-destructive">{errs.phone.message}</p>}
               </div>

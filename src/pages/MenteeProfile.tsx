@@ -38,6 +38,7 @@ import {
   Instagram, MapPin, Settings2, Sparkles, User, Edit3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PhoneInput } from "@/components/ui/phone-input";
 import ResumeUploadCard from "@/components/profile/ResumeUploadCard";
 import { useBranding } from "@/contexts/BrandingContext";
 
@@ -541,11 +542,9 @@ const MenteeProfile = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div className="space-y-1.5">
                   <FieldLabel htmlFor="phone">Phone number</FieldLabel>
-                  <Input
-                    id="phone"
+                  <PhoneInput
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+91 98765 43210"
+                    onChange={setPhone}
                   />
                 </div>
                 <div className="space-y-1.5">

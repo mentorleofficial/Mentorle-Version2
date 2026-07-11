@@ -1,6 +1,22 @@
 import { z } from "zod";
 
-const phoneRegex = /^[+\d][\d\s\-().]{6,19}$/;
+const validPhone = (val: string) => {
+  const match = val.match(/^\+(\d{1,4})\s(\d+)$/);
+  if (!match) return false;
+  const digits = match[2];
+  return digits.length >= 4 && digits.length <= 15;
+};
+
+export const phoneSchema = z
+  .string()
+  .trim()
+  .refine((val) => !val || validPhone(val), "Enter a valid phone number");
+
+export const phoneSchemaRequired = z
+  .string()
+  .trim()
+  .min(1, "Phone number is required")
+  .refine(validPhone, "Enter a valid phone number");
 
 const urlOrEmpty = z
   .string()
@@ -48,7 +64,7 @@ export const experienceSchema = z
 export const mentorProfileSchema = z
   .object({
     full_name: z.string().trim().min(2, "Required").max(100),
-    phone: z.string().trim().regex(phoneRegex, "Enter a valid phone number").or(z.literal("")),
+    phone: phoneSchema.or(z.literal("")),
     headline: z.string().trim().max(160).or(z.literal("")),
     bio: z.string().trim().min(50, "Bio must be at least 50 characters").max(2000),
     current_organization: z.string().trim().max(150).or(z.literal("")),

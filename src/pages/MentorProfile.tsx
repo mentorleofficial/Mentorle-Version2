@@ -47,6 +47,7 @@ import ExpertiseInput from "@/features/mentor-profile/components/ExpertiseInput"
 import ExperienceList from "@/features/mentor-profile/components/ExperienceList";
 import QualificationsList from "@/features/mentor-profile/components/QualificationsList";
 import ResumeUploadCard from "@/components/profile/ResumeUploadCard";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { getResumeSignedUrl } from "@/features/mentor-profile/api/mentorProfile";
 import AvatarUploader from "@/features/mentor-profile/components/AvatarUploader";
 import { calculateCompleteness } from "@/features/mentor-profile/utils/completeness";
@@ -445,15 +446,15 @@ const MentorProfile = () => {
                   <Label className="flex items-center gap-1.5">
                     <Phone className="h-3.5 w-3.5" /> Contact number *
                   </Label>
-                  <Input
-                    type="tel"
-                    placeholder="+1 555 123 4567"
-                    {...form.register("phone")}
-                    onInput={(e) => {
-                      const el = e.currentTarget;
-                      const cleaned = el.value.replace(/[^0-9+\-\s().]/g, "");
-                      if (cleaned !== el.value) el.value = cleaned;
-                    }}
+                  <Controller
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <PhoneInput
+                        value={field.value}
+                        onChange={field.onChange}
+                      />
+                    )}
                   />
                   {form.formState.errors.phone && (
                     <p className="text-xs text-destructive">{form.formState.errors.phone.message}</p>

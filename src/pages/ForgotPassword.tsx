@@ -30,6 +30,19 @@ export default function ForgotPassword() {
 
     setIsLoading(true);
     try {
+      const { data: exists } = await supabase.rpc("check_email_exists", {
+        email_to_check: email.trim(),
+      });
+
+      if (!exists) {
+        toast({
+          variant: "destructive",
+          title: "Account not found",
+          description: "No account found with this email address.",
+        });
+        return;
+      }
+
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
         redirectTo: `${window.location.origin}/reset-password`,
       });
@@ -38,7 +51,7 @@ export default function ForgotPassword() {
 
       toast({
         title: "Verification code sent",
-        description: "Please check your email for the 6-digit recovery code.",
+        description: "Please check your email for the 8-digit recovery code.",
       });
       setStep("verify");
     } catch (err: any) {
@@ -63,7 +76,7 @@ export default function ForgotPassword() {
 
       toast({
         title: "Code resent",
-        description: "A new 6-digit code has been sent to your email.",
+        description: "A new 8-digit code has been sent to your email.",
       });
     } catch (err: any) {
       toast({
@@ -100,7 +113,7 @@ export default function ForgotPassword() {
 
     setIsLoading(true);
     try {
-      // 1. Verify the 6-digit recovery OTP code
+      // 1. Verify the 8-digit recovery OTP code
       const { error: otpError } = await supabase.auth.verifyOtp({
         email: email.trim(),
         token: otp.trim(),
@@ -160,7 +173,7 @@ export default function ForgotPassword() {
           <CardDescription>
             {step === "request"
               ? `Reset your password for ${branding.app_name}`
-              : `Enter the 6-digit code sent to ${email} to reset your password`}
+              : `Enter the 8-digit code sent to ${email} to reset your password`}
           </CardDescription>
         </CardHeader>
         <CardContent>
