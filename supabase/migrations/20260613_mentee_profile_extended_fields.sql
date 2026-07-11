@@ -1,0 +1,16 @@
+ALTER TABLE mentee_profiles
+  ADD COLUMN IF NOT EXISTS phone                      text,
+  ADD COLUMN IF NOT EXISTS current_status             text,
+  ADD COLUMN IF NOT EXISTS education_level            text,
+  ADD COLUMN IF NOT EXISTS location                   text,
+  ADD COLUMN IF NOT EXISTS timezone                   text DEFAULT 'Asia/Kolkata',
+  ADD COLUMN IF NOT EXISTS skills                     text[] DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS languages                  text[] DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS education_details          jsonb,
+  ADD COLUMN IF NOT EXISTS work_experience            jsonb DEFAULT '[]',
+  ADD COLUMN IF NOT EXISTS preferred_industries       text[] DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS preferred_session_types    text[] DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS preferred_time_windows     text[] DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS preferred_mentor_qualities text[] DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS instagram_url              text,
+  ADD COLUMN IF NOT EXISTS resume_url                 text;
