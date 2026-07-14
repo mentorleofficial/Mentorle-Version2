@@ -23,18 +23,15 @@ import {
 import {
   CheckCircle2,
   X,
-  Upload,
   Loader2,
   Mail,
   Eye,
   EyeOff,
-  FileText,
   Plus,
   ArrowLeft,
   ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getResumeSignedUrl } from "@/features/mentor-profile/api/mentorProfile";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { phoneSchema } from "@/features/mentor-profile/schema";
 
@@ -111,9 +108,6 @@ const STEPS = [
   { key: "verify", label: "Verify" },
 ] as const;
 
-const formatBytes = (n: number) =>
-  n < 1024 * 1024 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`;
-
 interface Props {
   /** Called after successful verification + redirect (e.g. dialog close). */
   onComplete?: () => void;
@@ -128,48 +122,16 @@ const MentorApplicationForm = ({ onComplete }: Props) => {
   const [stage, setStage] = useState<Stage>("wizard");
   const [expertise, setExpertise] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
-  const [resume, setResume] = useState<File | null>(null);
-  const [resumeError, setResumeError] = useState<string | null>(null);
   const [expertiseError, setExpertiseError] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [otp, setOtp] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [resendIn, setResendIn] = useState(0);
-  const fileRef = useRef<HTMLInputElement>(null);
   const firstFieldRef = useRef<HTMLInputElement>(null);
-  const [existingResumePath, setExistingResumePath] = useState<string>("");
   const [existingAppId, setExistingAppId] = useState<string | null>(null);
-  const [resumeUrl, setResumeUrl] = useState<string | null>(null);
-  const [isLoadingResume, setIsLoadingResume] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    const fetchResume = async () => {
-      if (!existingResumePath) {
-        setResumeUrl(null);
-        return;
-      }
-      setIsLoadingResume(true);
-      try {
-        const url = await getResumeSignedUrl(existingResumePath);
-        if (active && url) {
-          setResumeUrl(url);
-        }
-      } catch (err) {
-        console.error("Error signing resume URL:", err);
-      } finally {
-        if (active) setIsLoadingResume(false);
-      }
-    };
-    fetchResume();
-    return () => {
-      active = false;
-    };
-  }, [existingResumePath]);
-
-  const [pending, setPending] = useState<{ values: FormValues; resumePath: string } | null>(null);
+  const [pending, setPending] = useState<{ values: FormValues } | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -222,9 +184,6 @@ const MentorApplicationForm = ({ onComplete }: Props) => {
             current_role: data.current_role || "",
           });
           setExpertise(data.expertise || []);
-          if (data.resume_url) {
-            setExistingResumePath(data.resume_url);
-          }
         } else {
           form.setValue("email", user.email || "");
           form.setValue("password", "dummy-password-value-123");
@@ -271,25 +230,6 @@ const MentorApplicationForm = ({ onComplete }: Props) => {
     setExpertiseError(null);
   };
 
-  const handleFile = (f: File | null) => {
-    if (!f) return;
-    if (f.size > 5 * 1024 * 1024) {
-      setResumeError("Resume must be under 5MB");
-      return;
-    }
-    const okType = [
-      "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ];
-    if (!okType.includes(f.type)) {
-      setResumeError("Resume must be PDF or DOC/DOCX");
-      return;
-    }
-    setResumeError(null);
-    setResume(f);
-  };
-
   const validateStep = async (idx: number): Promise<boolean> => {
     if (idx === 0) {
       const ok = await form.trigger(["full_name", "email", ...(user ? [] : ["password" as const]), "phone"] as const);
@@ -327,12 +267,6 @@ const MentorApplicationForm = ({ onComplete }: Props) => {
         valid = false;
       } else {
         setExpertiseError(null);
-      }
-      if (!resume && !existingResumePath) {
-        setResumeError("Please upload your resume");
-        valid = false;
-      } else {
-        setResumeError(null);
       }
       return valid;
     }
@@ -405,32 +339,6 @@ const MentorApplicationForm = ({ onComplete }: Props) => {
       const inCooldown = await checkCooldown(user?.email || values.email);
       if (inCooldown) return;
 
-      let resumePath = "";
-      if (resume) {
-        const ext = resume.name.split(".").pop();
-        if (user) {
-          // If logged in, upload to user-scoped folder to match the "Users upload own resume" RLS policy
-          resumePath = `${user.id}/${Date.now()}.${ext}`;
-        } else {
-          // If anonymous guest, upload to the applications folder (handled by "Anonymous can upload application resume" RLS policy)
-          const uploadId = (crypto as any)?.randomUUID
-            ? (crypto as any).randomUUID()
-            : `${Date.now()}-${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
-          resumePath = `applications/${uploadId}/resume.${ext}`;
-        }
-        const { error: upErr } = await supabase.storage
-          .from("mentor-resumes")
-          .upload(resumePath, resume, { contentType: resume.type });
-        if (upErr) throw upErr;
-      } else {
-        resumePath = existingResumePath;
-      }
-
-      if (!resumePath && !user) {
-        toast({ variant: "destructive", title: "Resume required", description: "Please upload your resume." });
-        return;
-      }
-
       if (user) {
         let appErr;
         if (existingAppId) {
@@ -448,7 +356,7 @@ const MentorApplicationForm = ({ onComplete }: Props) => {
               bio: values.bio,
               expertise,
               years_experience: values.years_experience,
-              resume_url: resumePath || null,
+              resume_url: null,
               professional_status: values.professional_status || null,
               current_organization: values.current_organization || null,
               current_role: values.current_role || null,
@@ -471,7 +379,7 @@ const MentorApplicationForm = ({ onComplete }: Props) => {
             bio: values.bio,
             expertise,
             years_experience: values.years_experience,
-            resume_url: resumePath || null,
+            resume_url: null,
             professional_status: values.professional_status || null,
             current_organization: values.current_organization || null,
             current_role: values.current_role || null,
@@ -501,7 +409,7 @@ const MentorApplicationForm = ({ onComplete }: Props) => {
             linkedin_url: values.linkedin_url || "",
             portfolio_url: values.portfolio_url || "",
             phone: values.phone || "",
-            resume_url: resumePath || "",
+            resume_url: "",
             professional_status: values.professional_status || "",
             current_organization: values.current_organization || "",
             current_role: values.current_role || "",
@@ -558,7 +466,7 @@ const MentorApplicationForm = ({ onComplete }: Props) => {
         throw signUpErr;
       }
 
-      setPending({ values, resumePath });
+      setPending({ values });
       setStage("otp");
       setStepIdx(3);
       setResendIn(60);
@@ -596,7 +504,7 @@ const MentorApplicationForm = ({ onComplete }: Props) => {
         bio: pending.values.bio,
         expertise,
         years_experience: pending.values.years_experience,
-        resume_url: pending.resumePath,
+        resume_url: null,
         professional_status: pending.values.professional_status || null,
         current_organization: pending.values.current_organization || null,
         current_role: pending.values.current_role || null,
@@ -617,7 +525,7 @@ const MentorApplicationForm = ({ onComplete }: Props) => {
           linkedin_url: pending.values.linkedin_url || "",
           portfolio_url: pending.values.portfolio_url || "",
           phone: pending.values.phone || "",
-          resume_url: pending.resumePath || "",
+          resume_url: "",
           is_active: false,
           professional_status: pending.values.professional_status || "",
           current_organization: pending.values.current_organization || "",
@@ -1009,120 +917,6 @@ const MentorApplicationForm = ({ onComplete }: Props) => {
                 </div>
               )}
               {expertiseError && <p className="text-xs text-destructive">{expertiseError}</p>}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>
-                Resume <span className="text-destructive">*</span>
-              </Label>
-              <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragOver(true);
-                }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragOver(false);
-                  handleFile(e.dataTransfer.files?.[0] ?? null);
-                }}
-                className={cn(
-                  "rounded-md border-2 border-dashed p-4 transition-colors",
-                  dragOver ? "border-primary bg-primary/5" : "border-input"
-                )}
-              >
-                {resume ? (
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-8 w-8 text-primary shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{resume.name}</p>
-                      <p className="text-xs text-muted-foreground">{formatBytes(resume.size)}</p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setResume(null);
-                        if (fileRef.current) fileRef.current.value = "";
-                      }}
-                      aria-label="Remove file"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : existingResumePath ? (
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-8 w-8 text-primary shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{existingResumePath.split("/").pop() ?? "Resume"}</p>
-                      <p className="text-xs text-muted-foreground">Uploaded</p>
-                    </div>
-                    <div className="flex gap-1">
-                      {resumeUrl ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          asChild
-                        >
-                          <a href={resumeUrl} target="_blank" rel="noopener noreferrer">
-                            View
-                          </a>
-                        </Button>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          disabled
-                        >
-                          {isLoadingResume ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            "View"
-                          )}
-                        </Button>
-                      )}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setExistingResumePath("");
-                          setTimeout(() => fileRef.current?.click(), 50);
-                        }}
-                      >
-                        Replace
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setExistingResumePath("")}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <Upload className="h-5 w-5 text-muted-foreground" />
-                    <div className="flex-1 text-sm">
-                      <span className="text-foreground font-medium">Click to upload</span>
-                      <span className="text-muted-foreground"> or drag and drop — PDF or DOC, max 5MB</span>
-                    </div>
-                    <input
-                      ref={fileRef}
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                      onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
-                    />
-                  </label>
-                )}
-              </div>
-              {resumeError && <p className="text-xs text-destructive">{resumeError}</p>}
             </div>
           </div>
         )}
