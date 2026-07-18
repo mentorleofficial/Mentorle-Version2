@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BrandingSettings from "@/components/admin/BrandingSettings";
 import JwtSettings from "@/components/admin/JwtSettings";
 import PrivacySettings from "@/components/admin/PrivacySettings";
-import EdubridgeSettings from "@/components/admin/EdubridgeSettings";
+import LeaderboardSettings from "@/components/admin/LeaderboardSettings";
 import ApplicationPolicySettings from "@/components/admin/ApplicationPolicySettings";
 
 const AdminSettings = () => {
@@ -19,13 +19,13 @@ const AdminSettings = () => {
             <TabsTrigger value="branding" className="shrink-0">Branding</TabsTrigger>
             <TabsTrigger value="jwt" className="shrink-0">SSO / JWT</TabsTrigger>
             <TabsTrigger value="privacy" className="shrink-0">Privacy</TabsTrigger>
-            <TabsTrigger value="edubridge" className="shrink-0">EduBridge</TabsTrigger>
+            <TabsTrigger value="leaderboard" className="shrink-0">Leaderboard</TabsTrigger>
             <TabsTrigger value="applications" className="shrink-0">Applications</TabsTrigger>
           </TabsList>
           <TabsContent value="branding" className="mt-6"><BrandingSettings /></TabsContent>
           <TabsContent value="jwt" className="mt-6"><JwtSettings /></TabsContent>
           <TabsContent value="privacy" className="mt-6"><PrivacySettings /></TabsContent>
-          <TabsContent value="edubridge" className="mt-6"><EdubridgeSettings /></TabsContent>
+          <TabsContent value="leaderboard" className="mt-6"><LeaderboardSettings /></TabsContent>
           <TabsContent value="applications" className="mt-6"><ApplicationPolicySettings /></TabsContent>
         </Tabs>
       </div>

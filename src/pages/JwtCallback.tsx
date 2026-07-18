@@ -5,7 +5,7 @@ import { useBranding } from "@/contexts/BrandingContext";
 import { useToast } from "@/hooks/use-toast";
 
 /**
- * Receives an external JWT (from EduBridge or another IdP), exchanges it
+ * Receives an external JWT from a configured identity provider, exchanges it
  * via the `jwt-exchange` edge function for a real Supabase session, then
  * persists it via `setSession()` so the user stays logged in across refreshes.
  */

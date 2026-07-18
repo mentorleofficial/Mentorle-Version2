@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Programming/BeezTech/**)",
+      "Read(//c/Programming/BeezTech/db backup/**)",
+      "PowerShell($a = Get-FileHash \"c:\\\\Programming\\\\BeezTech\\\\Mentorle-Version2\\\\src\\\\integrations\\\\supabase\\\\types.ts\" -Algorithm MD5; $b = Get-FileHash \"c:\\\\Programming\\\\BeezTech\\\\Edubrige\\\\src\\\\integrations\\\\supabase\\\\types.ts\" -Algorithm MD5 -ErrorAction SilentlyContinue; \"MV2: $\\($a.Hash\\)\"; \"EDU: $\\($b.Hash\\)\"; \"Same: $\\($a.Hash -eq $b.Hash\\)\"; \\(Get-Item \"c:\\\\Programming\\\\BeezTech\\\\Mentorle-Version2\\\\src\\\\integrations\\\\supabase\\\\types.ts\"\\).LastWriteTime; \\(Get-Item \"c:\\\\Programming\\\\BeezTech\\\\Edubrige\\\\src\\\\integrations\\\\supabase\\\\types.ts\" -ErrorAction SilentlyContinue\\).LastWriteTime)",
+      "Read(//c/Programming/BeezTech/Edubrige/supabase/**)",
+      "Read(//c/Programming/BeezTech/Edubrige/**)",
+      "Read(//c/Programming/BeezTech/Mentorle/mentorle.in/**)",
+      "PowerShell(supabase projects api-keys --project-ref xykindgwltvgcrcuwmik -o json 2>&1)",
+      "PowerShell(\\(Get-Content \"c:\\\\Programming\\\\BeezTech\\\\Mentorle-Version2\\\\package.json\" | ConvertFrom-Json\\).scripts | Out-String; npx --yes supabase --version 2>&1 | Select-Object -First 3 | Out-String)",
+      "Bash(npx --yes supabase functions deploy send-booking-email --project-ref xykindgwltvgcrcuwmik)",
+      "Bash(npx --yes supabase functions deploy export-user-data --project-ref xykindgwltvgcrcuwmik)",
+      "Bash(npx --yes supabase functions deploy refresh-mentor-engagement --project-ref xykindgwltvgcrcuwmik)",
+      "PowerShell(cd \"c:\\\\Programming\\\\BeezTech\\\\Mentorle-Version2\"; $secret = -join \\(\\(1..48\\) | ForEach-Object { \"0123456789abcdef\"[\\(Get-Random -Max 16\\)] }\\); npx --yes supabase secrets set \"CRON_SECRET=$secret\" --project-ref xykindgwltvgcrcuwmik 2>&1 | Out-String; \"CRON_SECRET value \\(save for the cron reschedule snippet\\): $secret\")"
+    ]
+  }
+}

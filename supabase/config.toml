@@ -1,4 +1,4 @@
-project_id = "uibbavdzxmictgqdcuny"
+project_id = "xykindgwltvgcrcuwmik"
 
 [auth.email]
 otp_length = 8
@@ -11,10 +11,18 @@ verify_jwt = false
 [functions.admin-manage-user]
 verify_jwt = false
 
-[functions.send-booking-email]
+# Same stale-token 401 issue as approve; both do their own admin check internally.
+[functions.reject-mentor-application]
 verify_jwt = false
 
-[functions.sync-to-edubridge]
+[functions.request-application-changes]
+verify_jwt = false
+
+# Called by pg_cron (no JWT); guarded internally via CRON_SECRET header.
+[functions.send-session-reminders]
+verify_jwt = false
+
+[functions.send-booking-email]
 verify_jwt = false
 
 [functions.mentor-application-decision-email]
