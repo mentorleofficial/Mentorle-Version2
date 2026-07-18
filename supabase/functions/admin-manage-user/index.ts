@@ -103,7 +103,7 @@ function getAppUrl(req: Request, branding?: any): string {
   }
 
   // 5. Production fallback
-  return "https://mentorle.vercel.app/";
+  return "https://platform.mentorle.in";
 }
 
 Deno.serve(async (req) => {

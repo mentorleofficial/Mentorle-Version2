@@ -102,10 +102,6 @@ const Login = () => {
               {isLoading ? "Signing in…" : "Sign In"}
             </Button>
           </form>
-          {/* <p className="mt-6 text-center text-sm text-muted-foreground">
-            Mentees sign in through{" "}
-            <span className="font-medium text-primary">EduBridge</span>
-          </p> */}
           <p className="mt-2 text-center text-sm text-muted-foreground">
             New here?{" "}
             <a href="/signup" className="font-medium text-primary hover:underline">

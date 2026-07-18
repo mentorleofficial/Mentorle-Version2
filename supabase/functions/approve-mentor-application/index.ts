@@ -142,17 +142,6 @@ Deno.serve(async (req) => {
       details: { mentor_user_id: mentorUserId, email: app.email },
     });
 
-    // Queue outbound event for EduBridge sync
-    await admin.from("outbound_events").insert({
-      event_type: "mentor.approved",
-      payload: {
-        mentor_user_id: mentorUserId,
-        email: app.email,
-        full_name: app.full_name,
-        slug: mentorSlug,
-      },
-    });
-
     // Fire decision email (don't fail approval if email fails)
     try {
       await admin.functions.invoke("mentor-application-decision-email", {

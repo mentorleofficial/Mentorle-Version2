@@ -169,7 +169,7 @@ const MenteeProfile = () => {
       workExperience: d.work_experience ?? [],
       preferredIndustries: d.preferred_industries ?? [],
       preferredSessionTypes: d.preferred_session_types ?? [],
-      preferredTimeWindows: Array.from(new Set((d.preferred_time_windows ?? []).map(formatTimeWindow))),
+      preferredTimeWindows: Array.from(new Set(((d.preferred_time_windows ?? []) as string[]).map(formatTimeWindow))),
       preferredMentorQualities: d.preferred_mentor_qualities ?? [],
       instagram: d.instagram_url ?? "",
       resumeUrl: d.resume_url ?? null,
