@@ -27,6 +27,7 @@ import {
   CalendarPlus,
   ListTodo,
   MessageCircle,
+  Sparkles,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -71,6 +72,7 @@ const AppSidebar = () => {
     { title: "Programs", icon: FolderKanban, path: "/admin/programs" },
     { title: "Mentorship Listings", icon: Tag, path: "/admin/offerings" },
     { title: "Sessions", icon: BookOpen, path: "/admin/sessions" },
+    { title: "Memberships", icon: Sparkles, path: "/admin/memberships" },
     { title: "Events", icon: CalendarDays, path: "/admin/events" },
     { title: "Feedback", icon: Star, path: "/admin/feedback" },
     { title: "Platform Feedback", icon: MessageCircle, path: "/admin/general-feedback" },
@@ -113,6 +115,7 @@ const AppSidebar = () => {
     { title: "Find Mentors", icon: GraduationCap, path: "/mentors" },
     { title: "Book Session", icon: CalendarPlus, path: "/mentee/book" },
     { title: "My Sessions", icon: BookOpen, path: "/mentee/sessions" },
+    { title: "Mentorle Plus", icon: Sparkles, path: "/mentee/plus" },
     { title: "My Tasks", icon: ListTodo, path: "/mentee/tasks", badge: openTasksCount || undefined },
     { title: "My Feedback", icon: MessageCircle, path: "/feedback" },
     { title: "Privacy & My Data", icon: Shield, path: "/account/privacy" },

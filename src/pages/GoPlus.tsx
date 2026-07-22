@@ -1,0 +1,220 @@
+import { useEffect, useState } from "react";
+import { format } from "date-fns";
+import AppLayout from "@/components/AppLayout";
+import { useAuth } from "@/contexts/AuthContext";
+import { useActivePlans, useMyMembership, useCreateSubscription, useCancelSubscription } from "@/features/plus/usePlus";
+import { getCashfree } from "@/features/payments/cashfree";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { Check, Sparkles, Loader2 } from "lucide-react";
+
+const GoPlus = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const { data: plans = [], isLoading } = useActivePlans();
+  const [activating, setActivating] = useState(false);
+  const { data: membership } = useMyMembership(user?.id, activating);
+  const subscribe = useCreateSubscription();
+  const cancel = useCancelSubscription();
+  const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
+
+  const isActive = membership?.status === "active";
+
+  useEffect(() => {
+    if (activating && membership?.status === "active") {
+      setActivating(false);
+      toast({ title: "You're on Plus! 🎉", description: "Your membership is now active." });
+    }
+  }, [activating, membership?.status, toast]);
+
+  const handleSubscribe = async (planId: string) => {
+    setPendingPlanId(planId);
+    try {
+      const res = await subscribe.mutateAsync({ planId });
+      const cashfree = await getCashfree(res.cashfree_mode);
+      if (!cashfree?.subscriptionsCheckout) {
+        toast({ variant: "destructive", title: "Payment unavailable", description: "Please try again shortly." });
+        return;
+      }
+      const result = await cashfree.subscriptionsCheckout({
+        subsSessionId: res.subscription_session_id,
+        redirectTarget: "_modal",
+      });
+      if (result?.error) {
+        toast({
+          variant: "destructive",
+          title: "Mandate not completed",
+          description: result.error.message ?? "Please try again.",
+        });
+        return;
+      }
+      setActivating(true); // the subscription webhook flips the membership to active — poll for it
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Couldn't start subscription",
+        description: e instanceof Error ? e.message : "Please try again.",
+      });
+    } finally {
+      setPendingPlanId(null);
+    }
+  };
+
+  const doCancel = async (atPeriodEnd: boolean) => {
+    try {
+      await cancel.mutateAsync({ atPeriodEnd });
+      toast({
+        title: atPeriodEnd ? "Cancelled — won't renew" : "Membership ended",
+        description: atPeriodEnd
+          ? "You'll keep Plus until your renewal date."
+          : "Your Plus benefits have ended.",
+      });
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Couldn't cancel",
+        description: e instanceof Error ? e.message : "Please try again.",
+      });
+    }
+  };
+
+  return (
+    <AppLayout>
+      <div className="mx-auto max-w-4xl space-y-6">
+        <div className="space-y-2 text-center">
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+            <Sparkles className="h-3.5 w-3.5" /> Mentorle Plus
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight">Unlock more with Plus</h1>
+          <p className="text-muted-foreground">
+            2 free expert sessions every month, better discounts, premium resources, and more.
+          </p>
+        </div>
+
+        {membership && (
+          <Card>
+            <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+              <div>
+                <p className="flex items-center gap-2 font-medium">
+                  Your membership
+                  <Badge variant={isActive ? "default" : "secondary"} className="capitalize">
+                    {membership.status}
+                  </Badge>
+                </p>
+                {membership.current_period_end && (
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {isActive && !membership.cancel_at_period_end ? "Renews" : "Ends"} on{" "}
+                    {format(new Date(membership.current_period_end), "d MMM yyyy")}
+                  </p>
+                )}
+              </div>
+              {membership.cancel_at_period_end ? (
+                <Badge variant="outline" className="text-xs">Won't renew</Badge>
+              ) : membership.status === "active" || membership.status === "past_due" ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm" disabled={cancel.isPending}>
+                      {cancel.isPending ? "Cancelling…" : "Cancel membership"}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Cancel Mentorle Plus?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {membership.current_period_end ? (
+                          <>
+                            <strong>Cancel at renewal</strong> keeps your Plus benefits until{" "}
+                            {format(new Date(membership.current_period_end), "d MMM yyyy")}, then stops — no further
+                            charges. <strong>End now</strong> ends Plus immediately.
+                          </>
+                        ) : (
+                          "Choose how to cancel your Plus membership."
+                        )}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+                      <AlertDialogCancel className="mt-0">Keep Plus</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => doCancel(true)}>Cancel at renewal</AlertDialogAction>
+                      <AlertDialogAction
+                        onClick={() => doCancel(false)}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        End now
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : null}
+            </CardContent>
+          </Card>
+        )}
+
+        {(activating || membership?.status === "pending") && (
+          <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Activating your membership…
+          </p>
+        )}
+
+        {isLoading ? (
+          <p className="py-8 text-center text-muted-foreground">Loading plans…</p>
+        ) : plans.length === 0 ? (
+          <p className="py-8 text-center text-muted-foreground">No plans are available right now.</p>
+        ) : (
+          <div className="grid gap-5 sm:grid-cols-2">
+            {plans.map((plan) => (
+              <Card key={plan.id} className="flex flex-col">
+                <CardHeader>
+                  <CardTitle>{plan.name}</CardTitle>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-semibold">₹{plan.price}</span>
+                    <span className="text-sm text-muted-foreground">/ {plan.interval}</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col gap-4">
+                  <ul className="flex-1 space-y-2">
+                    {plan.benefits.map((b, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <span>{b}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button
+                    className="w-full"
+                    disabled={isActive || pendingPlanId === plan.id}
+                    onClick={() => handleSubscribe(plan.id)}
+                  >
+                    {isActive ? (
+                      "You're on Plus"
+                    ) : pendingPlanId === plan.id ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Starting…
+                      </>
+                    ) : (
+                      `Subscribe ${plan.interval === "year" ? "yearly" : "monthly"}`
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </AppLayout>
+  );
+};
+
+export default GoPlus;

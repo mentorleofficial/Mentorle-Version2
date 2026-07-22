@@ -57,6 +57,8 @@ const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
 const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
 const MenteeBookSession = lazy(() => import("@/pages/MenteeBookSession"));
 const MenteeTasks = lazy(() => import("@/pages/MenteeTasks"));
+const GoPlus = lazy(() => import("@/pages/GoPlus"));
+const AdminMemberships = lazy(() => import("@/pages/AdminMemberships"));
 const FeedbackInbox = lazy(() => import("@/pages/FeedbackInbox"));
 
 const App = () => (
@@ -96,6 +98,7 @@ const App = () => (
                   <Route path="/admin/offerings" element={<RoleGuard allowedRoles={["admin"]}><AdminOfferings /></RoleGuard>} />
                   <Route path="/admin/settings" element={<RoleGuard allowedRoles={["admin"]}><AdminSettings /></RoleGuard>} />
                   <Route path="/admin/sessions" element={<RoleGuard allowedRoles={["admin"]}><AdminSessions /></RoleGuard>} />
+                  <Route path="/admin/memberships" element={<RoleGuard allowedRoles={["admin"]}><AdminMemberships /></RoleGuard>} />
                   <Route path="/admin/feedback" element={<RoleGuard allowedRoles={["admin"]}><AdminFeedback /></RoleGuard>} />
                   <Route path="/admin/general-feedback" element={<RoleGuard allowedRoles={["admin"]}><AdminGeneralFeedback /></RoleGuard>} />
                   <Route path="/admin/audit-logs" element={<RoleGuard allowedRoles={["admin"]}><AdminAuditLogs /></RoleGuard>} />
@@ -117,6 +120,7 @@ const App = () => (
                   <Route path="/book/:mentorId" element={<RoleGuard allowedRoles={["mentee"]}><MenteeOnboardingGuard><BookSession /></MenteeOnboardingGuard></RoleGuard>} />
                   <Route path="/mentee/book" element={<RoleGuard allowedRoles={["mentee"]}><MenteeOnboardingGuard><MenteeBookSession /></MenteeOnboardingGuard></RoleGuard>} />
                   <Route path="/mentee/tasks" element={<RoleGuard allowedRoles={["mentee"]}><MenteeOnboardingGuard><MenteeTasks /></MenteeOnboardingGuard></RoleGuard>} />
+                  <Route path="/mentee/plus" element={<RoleGuard allowedRoles={["mentee"]}><MenteeOnboardingGuard><GoPlus /></MenteeOnboardingGuard></RoleGuard>} />
                   <Route path="/session/:id/feedback" element={<RoleGuard allowedRoles={["mentor", "mentee"]}><SessionFeedback /></RoleGuard>} />
                   <Route path="/feedback" element={<RoleGuard allowedRoles={["mentor", "mentee"]}><FeedbackInbox /></RoleGuard>} />
                   <Route path="/privacy-policy" element={<PrivacyPolicy />} />

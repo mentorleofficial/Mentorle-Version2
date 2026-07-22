@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, ChevronLeft, ChevronRight, Clock, Globe, Info, Video, Copy } from "lucide-react";
+import { CheckCircle, ChevronLeft, ChevronRight, Clock, Globe, Info, Video, Copy, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   getMonthMatrix,
@@ -32,6 +32,11 @@ import {
 } from "@/features/mentee-booking/useBookSessionData";
 import AddToCalendarMenu from "@/components/AddToCalendarMenu";
 import { markdownToHtml } from "@/components/ui/markdown-editor";
+import { useQueryClient } from "@tanstack/react-query";
+import { menteeSessionsKey } from "@/features/mentee-sessions/useMenteeSessions";
+import { useCreateSessionOrder, usePaymentStatus } from "@/features/payments/usePayments";
+import CashfreeCheckout from "@/features/payments/CashfreeCheckout";
+import type { CashfreeMode } from "@/features/payments/cashfree";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -59,6 +64,8 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
   const { data: staticData, isPending } = useBookSessionStatic(open ? mentorId : undefined);
   const { data: bookedTimes = [] } = useBookedTimes(open ? mentorId : undefined, rescheduleSessionId ?? undefined);
   const bookMutation = useBookSession();
+  const qc = useQueryClient();
+  const createOrder = useCreateSessionOrder();
   const { data: menteePrograms = [] } = useMyPrograms();
   const [mentorProgramIds, setMentorProgramIds] = useState<string[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
@@ -106,6 +113,9 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
       setSelectedTime(null);
       setNotes("");
       setBookedSession(null);
+      setOrderInfo(null);
+      setPaymentSubmitted(false);
+      setConfirmTimedOut(false);
     }
   }, [open]);
 
@@ -125,6 +135,10 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [bookedSession, setBookedSession] = useState<{ scheduledAt: Date; meetingUrl: string } | null>(null);
+  const [orderInfo, setOrderInfo] = useState<{ orderId: string; paymentSessionId: string; mode: CashfreeMode; scheduledAt: Date } | null>(null);
+  const [paymentSubmitted, setPaymentSubmitted] = useState(false);
+  const [confirmTimedOut, setConfirmTimedOut] = useState(false);
+  const paymentStatus = usePaymentStatus(orderInfo?.orderId ?? null, paymentSubmitted);
 
   const matrix = useMemo(
     () => getMonthMatrix(cursor.getFullYear(), cursor.getMonth()),
@@ -211,10 +225,70 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
 
   const booking = bookMutation.isPending;
 
+  useEffect(() => {
+    const st = paymentStatus.data;
+    if (!st || !orderInfo || bookedSession) return;
+    if (st.status === "paid" && st.session_id) {
+      (async () => {
+        const { data } = await supabase
+          .from("sessions")
+          .select("meeting_url")
+          .eq("id", st.session_id!)
+          .maybeSingle();
+        if (user) {
+          qc.invalidateQueries({ queryKey: menteeSessionsKey(user.id) });
+          qc.invalidateQueries({ queryKey: ["mentee-dashboard", user.id] });
+        }
+        toast({ title: "Payment successful!", description: "Your session is confirmed." });
+        setBookedSession({
+          scheduledAt: orderInfo.scheduledAt,
+          meetingUrl: (data as { meeting_url?: string } | null)?.meeting_url ?? "",
+        });
+      })();
+    } else if (st.status === "failed") {
+      toast({ variant: "destructive", title: "Payment failed", description: "Please try booking again." });
+      setOrderInfo(null);
+      setPaymentSubmitted(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentStatus.data, orderInfo, bookedSession]);
+
+  useEffect(() => {
+    if (!paymentSubmitted || bookedSession) return;
+    const t = setTimeout(() => setConfirmTimedOut(true), 90_000);
+    return () => clearTimeout(t);
+  }, [paymentSubmitted, bookedSession]);
+
   const handleBook = async () => {
     if (!selectedDate || !selectedTime || !user || !mentorId) return;
     const scheduledAt = toISTDate(selectedDate, selectedTime);
     const duration = selectedOffering?.duration_minutes ?? 30;
+
+    if (selectedOffering && selectedOffering.price > 0) {
+      try {
+        const res = await createOrder.mutateAsync({
+          offeringId: selectedOffering.id,
+          mentorId,
+          scheduledAt: scheduledAt.toISOString(),
+          durationMinutes: duration,
+          title: selectedOffering.title || `Session with ${mentor?.full_name ?? "mentor"}`,
+          notes,
+        });
+        setOrderInfo({
+          orderId: res.order_id,
+          paymentSessionId: res.payment_session_id,
+          mode: res.cashfree_mode,
+          scheduledAt,
+        });
+      } catch (e) {
+        toast({
+          variant: "destructive",
+          title: "Couldn't start payment",
+          description: e instanceof Error ? e.message : "Please try again.",
+        });
+      }
+      return;
+    }
 
     try {
       const { meetingUrl } = await bookMutation.mutateAsync({
@@ -266,8 +340,16 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
       : mentor?.current_role || mentor?.headline || null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-hidden p-0 gap-0 flex flex-col">
+    <Dialog open={open} onOpenChange={onOpenChange} modal={!orderInfo}>
+      <DialogContent
+        className="sm:max-w-3xl max-h-[90vh] overflow-hidden p-0 gap-0 flex flex-col"
+        onInteractOutside={(e) => {
+          if (orderInfo && !bookedSession) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (orderInfo && !bookedSession) e.preventDefault();
+        }}
+      >
         {bookedSession ? (
           <div className="p-6 space-y-4 overflow-y-auto">
             <DialogHeader>
@@ -309,6 +391,53 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
             <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>
               Close
             </Button>
+          </div>
+        ) : orderInfo ? (
+          <div className="p-6 space-y-4 overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-lg">Complete payment</DialogTitle>
+            </DialogHeader>
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">{selectedOffering?.title}</span>
+                <span className="font-semibold">₹{selectedOffering?.price}</span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {formatISTDateTime(orderInfo.scheduledAt)} · {selectedOffering?.duration_minutes} min
+              </p>
+            </div>
+            {paymentSubmitted ? (
+              confirmTimedOut ? (
+                <div className="flex flex-col items-center gap-2 py-8 text-center">
+                  <p className="text-sm font-medium">Still confirming your payment…</p>
+                  <p className="text-xs text-muted-foreground">
+                    If your payment went through, the session will appear in <strong>My Sessions</strong> shortly.
+                  </p>
+                  <Button variant="outline" size="sm" className="mt-1" onClick={() => onOpenChange(false)}>
+                    Close
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2 py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">Confirming your payment…</p>
+                  <p className="text-xs text-muted-foreground">This can take a few seconds.</p>
+                </div>
+              )
+            ) : (
+              <CashfreeCheckout
+                paymentSessionId={orderInfo.paymentSessionId}
+                mode={orderInfo.mode}
+                amountLabel={`₹${selectedOffering?.price ?? ""}`}
+                onPaid={() => { setConfirmTimedOut(false); setPaymentSubmitted(true); }}
+                onError={(msg) => toast({ variant: "destructive", title: "Payment failed", description: msg })}
+              />
+            )}
+            {!paymentSubmitted && (
+              <Button variant="ghost" className="w-full" onClick={() => setOrderInfo(null)}>
+                Cancel
+              </Button>
+            )}
           </div>
         ) : (
           <>
@@ -558,9 +687,15 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
                               className="w-full"
                               size="sm"
                               onClick={handleBook}
-                              disabled={booking}
+                              disabled={booking || createOrder.isPending}
                             >
-                              {booking ? "Booking…" : "Confirm Booking"}
+                              {createOrder.isPending
+                                ? "Starting payment…"
+                                : booking
+                                ? "Booking…"
+                                : selectedOffering.price > 0
+                                ? `Proceed to payment · ₹${selectedOffering.price}`
+                                : "Confirm Booking"}
                             </Button>
                           </div>
                         )}
