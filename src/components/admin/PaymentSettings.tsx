@@ -26,6 +26,7 @@ const PaymentSettings = () => {
   const [settingsId, setSettingsId] = useState<string | null>(null);
   const [commission, setCommission] = useState<string | number>(20);
   const [plusPayout, setPlusPayout] = useState<string | number>(50);
+  const [plusDiscount, setPlusDiscount] = useState<string | number>(0);
   const [savingFees, setSavingFees] = useState(false);
   const [plans, setPlans] = useState<PlanRow[]>([]);
   const [savingPlanId, setSavingPlanId] = useState<string | null>(null);
@@ -37,6 +38,7 @@ const PaymentSettings = () => {
         setSettingsId(s.id);
         setCommission(s.commission_percent);
         setPlusPayout(s.plus_payout_percent);
+        setPlusDiscount((s as { plus_discount_percent?: number }).plus_discount_percent ?? 0);
       }
       const { data: p } = await supabase.from("subscription_plans").select("*").order("price");
       if (p) {
@@ -62,14 +64,25 @@ const PaymentSettings = () => {
 
   const saveFees = async () => {
     if (!settingsId) return;
+    if (Number(plusDiscount) > Number(commission)) {
+      toast({
+        variant: "destructive",
+        title: "Discount too high",
+        description: "The Plus member discount can't exceed the commission % — otherwise the platform loses money on discounted bookings.",
+      });
+      return;
+    }
     setSavingFees(true);
+    // plus_discount_percent becomes typed once migration 20260722220000 is applied + types regenerated.
+    const feesPayload = {
+      commission_percent: Number(commission) || 0,
+      plus_payout_percent: Number(plusPayout) || 0,
+      plus_discount_percent: Number(plusDiscount) || 0,
+      updated_at: new Date().toISOString(),
+    };
     const { error } = await supabase
       .from("payment_settings")
-      .update({
-        commission_percent: Number(commission) || 0,
-        plus_payout_percent: Number(plusPayout) || 0,
-        updated_at: new Date().toISOString(),
-      })
+      .update(feesPayload as never)
       .eq("id", settingsId);
     setSavingFees(false);
     toast(
@@ -116,7 +129,7 @@ const PaymentSettings = () => {
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Commission on paid 1:1 sessions (%)</Label>
+              <Label>Commission on paid 1:1 sessions and events (%)</Label>
               <Input
                 type="number"
                 min={0}
@@ -136,6 +149,19 @@ const PaymentSettings = () => {
                 onChange={(e) => setPlusPayout(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">When a Plus member books free, the mentor earns this % of the list price.</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Plus member discount on paid items (%)</Label>
+              <Input
+                type="number"
+                min={0}
+                max={Number(commission) || 0}
+                value={plusDiscount}
+                onChange={(e) => setPlusDiscount(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Discount Plus members get on paid 1:1s and events. Must be ≤ the commission ({commission || 0}%) — the discount comes out of the platform's cut. 0 = no discount.
+              </p>
             </div>
           </div>
           <div className="flex justify-end">

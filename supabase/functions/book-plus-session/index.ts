@@ -47,10 +47,41 @@ Deno.serve(async (req) => {
 
     const body = (await req.json().catch(() => ({}))) as Payload;
 
-    if (body.kind !== "session") {
-      // Event Plus-consumption is scaffolded (events.plus_price + event_participants insert)
-      // and wired up alongside the events booking flow.
-      return json({ error: "Only 'session' Plus booking is implemented in the foundation" }, 501);
+    if (body.kind === "event") {
+      if (!body.event_id) return json({ error: "event_id is required" }, 400);
+      const { data: ev } = await admin
+        .from("events_programs")
+        .select("id, created_by, plus_eligible, price, max_participants, participant_count")
+        .eq("id", body.event_id)
+        .maybeSingle();
+      if (!ev) return json({ error: "Event not found" }, 404);
+      if (!ev.plus_eligible) return json({ error: "This event is not available under Plus" }, 400);
+      if (ev.max_participants && (ev.participant_count ?? 0) >= ev.max_participants) {
+        return json({ error: "This event is full" }, 409);
+      }
+
+      const { data: reg, error: regErr } = await admin
+        .from("event_participants")
+        .insert({ event_id: ev.id, user_id: userId, registered_at: new Date().toISOString() })
+        .select("id")
+        .single();
+      if (regErr || !reg) return json({ error: "Failed to register: " + (regErr?.message ?? "") }, 500);
+
+      const { data: usageId, error: rpcErr } = await admin.rpc("consume_plus_session", {
+        _user_id: userId,
+        _kind: "event",
+        _mentor_id: ev.created_by,
+        _reference_id: reg.id,
+        _list_price: Number(ev.price ?? 0),
+      });
+      if (rpcErr) {
+        await admin.from("event_participants").delete().eq("id", reg.id); // roll back the registration
+        const msg = rpcErr.message ?? "";
+        if (msg.includes("QUOTA_EXHAUSTED")) return json({ error: "Your monthly Plus sessions are used up" }, 409);
+        if (msg.includes("NO_ACTIVE_MEMBERSHIP")) return json({ error: "No active Plus membership" }, 403);
+        return json({ error: "Could not register with Plus: " + msg }, 500);
+      }
+      return json({ registration_id: reg.id, usage_id: usageId });
     }
 
     if (!body.offering_id) return json({ error: "offering_id is required" }, 400);

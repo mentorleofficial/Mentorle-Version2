@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
-import { useActivePlans, useMyMembership, useCreateSubscription, useCancelSubscription } from "@/features/plus/usePlus";
+import { useActivePlans, useMyMembership, useCreateSubscription, useCancelSubscription, usePlusQuota } from "@/features/plus/usePlus";
 import { getCashfree } from "@/features/payments/cashfree";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ const GoPlus = () => {
   const { data: plans = [], isLoading } = useActivePlans();
   const [activating, setActivating] = useState(false);
   const { data: membership } = useMyMembership(user?.id, activating);
+  const { data: quota } = usePlusQuota(!!user);
   const subscribe = useCreateSubscription();
   const cancel = useCancelSubscription();
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
@@ -118,6 +119,14 @@ const GoPlus = () => {
                   <p className="mt-0.5 text-sm text-muted-foreground">
                     {isActive && !membership.cancel_at_period_end ? "Renews" : "Ends"} on{" "}
                     {format(new Date(membership.current_period_end), "d MMM yyyy")}
+                  </p>
+                )}
+                {quota?.has_membership && (
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      {quota.quota_remaining} of {quota.quota_total}
+                    </span>{" "}
+                    free sessions left this month
                   </p>
                 )}
               </div>

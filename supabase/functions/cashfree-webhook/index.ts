@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
 
           const { data: settings } = await admin.from("payment_settings").select("commission_percent").limit(1).maybeSingle();
           const commission = Number(settings?.commission_percent ?? 0);
-          const gross = Number(pay.amount);
+          const gross = Number(pay.payload?.original_amount ?? pay.amount); // mentor earns on the pre-discount price
           const fee = Math.round(gross * commission) / 100;
           await admin.from("mentor_earnings").insert({
             mentor_id: b.mentor_id,
@@ -91,6 +91,25 @@ Deno.serve(async (req) => {
             net_amount: gross - fee,
           });
         }
+      }
+
+      if (pay.kind === "event" && pay.payload?.event) {
+        const ev = pay.payload.event;
+        const { data: reg } = await admin.from("event_participants")
+          .insert({ event_id: ev.event_id, user_id: ev.user_id, registered_at: new Date().toISOString() })
+          .select("id").single();
+        const { data: settings } = await admin.from("payment_settings").select("commission_percent").limit(1).maybeSingle();
+        const commission = Number(settings?.commission_percent ?? 0);
+        const gross = Number(pay.payload?.original_amount ?? pay.amount); // mentor earns on the pre-discount price
+        const fee = Math.round(gross * commission) / 100;
+        await admin.from("mentor_earnings").insert({
+          mentor_id: ev.mentor_id,
+          source: "paid_event",
+          reference_id: reg?.id ?? ev.event_id,
+          gross_amount: gross,
+          fee_amount: fee,
+          net_amount: gross - fee,
+        });
       }
       return reply({ received: true });
     }

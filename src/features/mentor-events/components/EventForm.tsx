@@ -15,8 +15,10 @@ import {
   Users, 
   User,
   Plus,
+  Tag,
   AlertCircle
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import SessionManager from "./SessionManager";
 import type { EventProgram, EventSession } from "../api/events";
@@ -87,7 +89,8 @@ export default function EventForm({
     speaker_name: "",
     speaker_linkedin: "",
     speaker_github: "",
-    speaker_image: ""
+    speaker_image: "",
+    price: "0"
   });
 
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -99,6 +102,8 @@ export default function EventForm({
   
   // Advanced settings toggle
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const [plusEligible, setPlusEligible] = useState(false);
 
   // Initialize form with existing data when editing
   useEffect(() => {
@@ -124,10 +129,12 @@ export default function EventForm({
         speaker_name: initialData.speaker_name || "",
         speaker_linkedin: initialData.speaker_linkedin || "",
         speaker_github: initialData.speaker_github || "",
-        speaker_image: initialData.speaker_image || ""
+        speaker_image: initialData.speaker_image || "",
+        price: initialData.price != null ? String(initialData.price) : "0"
       });
       setImagePreview(initialData.banner_image_url || null);
-      
+      setPlusEligible(initialData.plus_eligible ?? false);
+
       // Check if event has sessions
       if (initialData.sessions && initialData.sessions.length > 0) {
         setIsMultiSession(true);
@@ -170,13 +177,15 @@ export default function EventForm({
       speaker_name: "",
       speaker_linkedin: "",
       speaker_github: "",
-      speaker_image: ""
+      speaker_image: "",
+      price: "0"
     });
     setImageFile(null);
     setImagePreview(null);
     setIsMultiSession(false);
     setShowAdvanced(false);
     setSessions([]);
+    setPlusEligible(false);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -311,6 +320,7 @@ export default function EventForm({
       ...formData,
       speaker_linkedin: formData.speaker_linkedin ? cleanUrl(formData.speaker_linkedin) : "",
       speaker_github: formData.speaker_github ? cleanUrl(formData.speaker_github) : "",
+      plus_eligible: plusEligible,
       sessions: validSessions
     };
     
@@ -419,6 +429,40 @@ export default function EventForm({
                     />
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+
+          {/* Pricing & Plus */}
+          <div className="bg-muted/30 border rounded-lg p-5">
+            <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+              <Tag className="h-4 w-4 text-muted-foreground" />
+              Pricing
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="price">Price (INR)</Label>
+                <Input
+                  id="price"
+                  name="price"
+                  type="number"
+                  min="0"
+                  value={formData.price}
+                  onChange={handleInputChange}
+                  placeholder="0 = free"
+                  className="mt-1.5"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Leave 0 for a free event. Paid events require payment to register.</p>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border bg-background p-3">
+                <div className="space-y-0.5 pr-3">
+                  <Label>Available under Mentorle Plus</Label>
+                  <p className="text-xs text-muted-foreground">Plus members can register free using a monthly session — you're paid a % of the ticket price.</p>
+                </div>
+                <Switch
+                  checked={plusEligible}
+                  onCheckedChange={setPlusEligible}
+                />
               </div>
             </div>
           </div>

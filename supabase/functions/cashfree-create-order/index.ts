@@ -17,6 +17,7 @@ const cashfreeBase = () => (isProd() ? "https://api.cashfree.com/pg" : "https://
 interface Payload {
   kind: "session" | "event" | "addon";
   offering_id?: string;
+  event_id?: string;
   mentor_id?: string;
   scheduled_at?: string;
   duration_minutes?: number;
@@ -73,8 +74,37 @@ Deno.serve(async (req) => {
       referenceId = off.id;
       bookingMentorId = off.mentor_id;
       if (amount <= 0) return json({ error: "Offering is free — no payment required" }, 400);
+    } else if (body.kind === "event") {
+      if (!body.event_id) return json({ error: "event_id is required" }, 400);
+      const { data: ev } = await admin
+        .from("events_programs")
+        .select("id, price, created_by, max_participants, participant_count")
+        .eq("id", body.event_id)
+        .maybeSingle();
+      if (!ev) return json({ error: "Event not found" }, 404);
+      amount = Number(ev.price ?? 0);
+      referenceId = ev.id;
+      bookingMentorId = ev.created_by;
+      if (amount <= 0) return json({ error: "Event is free — no payment required" }, 400);
+      if (ev.max_participants && (ev.participant_count ?? 0) >= ev.max_participants) {
+        return json({ error: "This event is full" }, 409);
+      }
     } else {
       return json({ error: `kind '${body.kind}' is not supported yet` }, 400);
+    }
+
+    // The mentor is paid on the ORIGINAL price; the Plus discount comes out of the platform's cut.
+    const originalAmount = amount;
+    // Plus member discount (server-authoritative — never trust a client-sent amount).
+    const { data: activeMem } = await admin
+      .from("memberships").select("id").eq("user_id", userId).eq("status", "active").maybeSingle();
+    if (activeMem) {
+      const { data: ps } = await admin
+        .from("payment_settings").select("plus_discount_percent").limit(1).maybeSingle();
+      const discountPercent = Number((ps as { plus_discount_percent?: number } | null)?.plus_discount_percent ?? 0);
+      if (discountPercent > 0) {
+        amount = Math.round(amount * (1 - discountPercent / 100) * 100) / 100;
+      }
     }
 
     const { data: mp } = await admin
@@ -106,28 +136,36 @@ Deno.serve(async (req) => {
               offering_id: body.offering_id,
             }
             : null,
+          event: body.kind === "event"
+            ? { event_id: body.event_id, user_id: userId, mentor_id: bookingMentorId }
+            : null,
+          original_amount: originalAmount,
         },
       })
       .select("id")
       .single();
     if (payErr || !pay) return json({ error: "Failed to record payment: " + (payErr?.message ?? "") }, 500);
 
-    // Hold the slot for the payment window so a concurrent paid booking can't take it.
-    const { data: holdId, error: holdErr } = await admin.rpc("reserve_slot", {
-      _mentor_id: bookingMentorId,
-      _mentee_id: userId,
-      _scheduled_at: body.scheduled_at,
-      _duration: body.duration_minutes,
-      _payment_id: pay.id,
-      _ttl_minutes: 15,
-    });
-    if (holdErr) {
-      await admin.from("payments").update({ status: "failed" }).eq("id", pay.id);
-      return json({ error: "Could not reserve the slot: " + holdErr.message }, 500);
-    }
-    if (!holdId) {
-      await admin.from("payments").update({ status: "failed" }).eq("id", pay.id);
-      return json({ error: "That slot was just taken — please pick another time." }, 409);
+    // Sessions hold the slot for the payment window; events have no slot to reserve.
+    let holdId: string | null = null;
+    if (body.kind === "session") {
+      const { data: hold, error: holdErr } = await admin.rpc("reserve_slot", {
+        _mentor_id: bookingMentorId,
+        _mentee_id: userId,
+        _scheduled_at: body.scheduled_at,
+        _duration: body.duration_minutes,
+        _payment_id: pay.id,
+        _ttl_minutes: 15,
+      });
+      if (holdErr) {
+        await admin.from("payments").update({ status: "failed" }).eq("id", pay.id);
+        return json({ error: "Could not reserve the slot: " + holdErr.message }, 500);
+      }
+      if (!hold) {
+        await admin.from("payments").update({ status: "failed" }).eq("id", pay.id);
+        return json({ error: "That slot was just taken — please pick another time." }, 409);
+      }
+      holdId = hold as string;
     }
 
     const cfRes = await fetch(`${cashfreeBase()}/orders`, {
@@ -149,7 +187,7 @@ Deno.serve(async (req) => {
     });
     const cfData = await cfRes.json().catch(() => ({}));
     if (!cfRes.ok || !cfData.payment_session_id) {
-      await admin.from("slot_holds").delete().eq("id", holdId);
+      if (holdId) await admin.from("slot_holds").delete().eq("id", holdId);
       await admin.from("payments").update({ status: "failed", payload: cfData }).eq("id", pay.id);
       return json({ error: "Cashfree order creation failed", details: cfData }, 502);
     }

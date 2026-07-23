@@ -21,6 +21,8 @@ export interface EventProgram {
   start_time: string;
   meeting_link: string | null;
   status: string; // 'upcoming', 'ongoing', 'completed', 'cancelled'
+  price: number;
+  plus_eligible: boolean;
   banner_image_url: string | null;
   sessions: EventSession[];
   max_participants: number | null;

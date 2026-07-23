@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import AppLayout from "@/components/AppLayout";
+import RefreshButton from "@/components/RefreshButton";
+import TablePagination from "@/components/TablePagination";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -19,8 +22,11 @@ interface MembershipRow {
 const statusVariant = (s: string): "default" | "destructive" | "secondary" =>
   s === "active" ? "default" : s === "past_due" ? "destructive" : "secondary";
 
+const PER_PAGE = 25;
+
 const AdminMemberships = () => {
-  const { data: rows = [], isLoading } = useQuery<MembershipRow[]>({
+  const [page, setPage] = useState(0);
+  const { data: rows = [], isLoading, isFetching, refetch } = useQuery<MembershipRow[]>({
     queryKey: ["admin", "memberships"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -35,13 +41,19 @@ const AdminMemberships = () => {
   });
 
   const activeCount = rows.filter((r) => r.status === "active").length;
+  const totalPages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
+  const safePage = Math.min(page, totalPages - 1);
+  const pagedRows = rows.slice(safePage * PER_PAGE, safePage * PER_PAGE + PER_PAGE);
 
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="font-serif text-2xl">Memberships</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Mentorle Plus subscribers and their status.</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="font-serif text-2xl">Memberships</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Mentorle Plus subscribers and their status.</p>
+          </div>
+          <RefreshButton onClick={() => refetch()} spinning={isFetching} />
         </div>
         <Card>
           <CardHeader>
@@ -54,7 +66,8 @@ const AdminMemberships = () => {
             ) : rows.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">No memberships yet.</p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="space-y-4">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -66,7 +79,7 @@ const AdminMemberships = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rows.map((r) => (
+                    {pagedRows.map((r) => (
                       <TableRow key={r.id}>
                         <TableCell>
                           <div className="font-medium">{r.users?.full_name || "—"}</div>
@@ -86,6 +99,8 @@ const AdminMemberships = () => {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
+                <TablePagination page={safePage} totalPages={totalPages} onPageChange={setPage} />
               </div>
             )}
           </CardContent>

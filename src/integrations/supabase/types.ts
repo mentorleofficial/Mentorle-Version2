@@ -491,7 +491,9 @@ export type Database = {
           max_participants: number | null
           meeting_link: string | null
           participant_count: number
+          plus_eligible: boolean
           prerequisites: string | null
+          price: number
           registration_deadline: string | null
           registration_link: string | null
           sessions: Json | null
@@ -525,7 +527,9 @@ export type Database = {
           max_participants?: number | null
           meeting_link?: string | null
           participant_count?: number
+          plus_eligible?: boolean
           prerequisites?: string | null
+          price?: number
           registration_deadline?: string | null
           registration_link?: string | null
           sessions?: Json | null
@@ -559,7 +563,9 @@ export type Database = {
           max_participants?: number | null
           meeting_link?: string | null
           participant_count?: number
+          plus_eligible?: boolean
           prerequisites?: string | null
+          price?: number
           registration_deadline?: string | null
           registration_link?: string | null
           sessions?: Json | null
@@ -1975,6 +1981,7 @@ export type Database = {
           commission_percent: number
           currency: string
           id: string
+          plus_discount_percent: number
           plus_payout_percent: number
           updated_at: string
           updated_by: string | null
@@ -1983,6 +1990,7 @@ export type Database = {
           commission_percent?: number
           currency?: string
           id?: string
+          plus_discount_percent?: number
           plus_payout_percent?: number
           updated_at?: string
           updated_by?: string | null
@@ -1991,6 +1999,7 @@ export type Database = {
           commission_percent?: number
           currency?: string
           id?: string
+          plus_discount_percent?: number
           plus_payout_percent?: number
           updated_at?: string
           updated_by?: string | null
@@ -3154,10 +3163,30 @@ export type Database = {
           title: string
         }[]
       }
+      plus_quota_status: {
+        Args: never
+        Returns: {
+          discount_percent: number
+          has_membership: boolean
+          quota_remaining: number
+          quota_total: number
+          quota_used: number
+        }[]
+      }
       plus_quota_window_start: {
         Args: { _anchor_day: number; _today: string }
         Returns: string
       }
+      process_withdrawal: {
+        Args: {
+          _action: string
+          _note?: string
+          _reference?: string
+          _request_id: string
+        }
+        Returns: undefined
+      }
+      request_withdrawal: { Args: never; Returns: string }
       reserve_slot: {
         Args: {
           _duration: number

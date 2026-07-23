@@ -146,6 +146,8 @@ export default function AdminEvents() {
         speaker_linkedin: formData.speaker_linkedin || null,
         speaker_github: formData.speaker_github || null,
         speaker_image: formData.speaker_image || null,
+        price: formData.price ? parseFloat(formData.price) : 0,
+        plus_eligible: !!formData.plus_eligible,
       };
 
       if (currentEvent) {

@@ -53,6 +53,12 @@ import {
   useUnregisterFromEvent,
 } from "@/features/mentor-events/useMentorEvents";
 import type { EventProgram } from "@/features/mentor-events/api/events";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { usePlusQuota, useBookPlusEvent } from "@/features/plus/usePlus";
+import { useCreateEventOrder } from "@/features/payments/usePayments";
+import { getCashfree } from "@/features/payments/cashfree";
 
 export default function MenteeEvents() {
   const { user } = useAuth();
@@ -64,6 +70,18 @@ export default function MenteeEvents() {
   // Mutations
   const registerMutation = useRegisterForEvent(user?.id);
   const unregisterMutation = useUnregisterFromEvent(user?.id);
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const { data: plusQuota } = usePlusQuota(!!user);
+  const createEventOrder = useCreateEventOrder();
+  const bookPlusEvent = useBookPlusEvent();
+  const [processingEventId, setProcessingEventId] = useState<string | null>(null);
+
+  const plusDiscount = plusQuota?.has_membership ? (plusQuota.discount_percent ?? 0) : 0;
+  const eventPrice = (e: EventProgram) =>
+    plusDiscount > 0 ? Math.round((e.price ?? 0) * (1 - plusDiscount / 100) * 100) / 100 : (e.price ?? 0);
+  const canPlusEvent = (e: EventProgram) =>
+    !!e.plus_eligible && (e.price ?? 0) > 0 && !!plusQuota?.has_membership && (plusQuota?.quota_remaining ?? 0) > 0;
 
   // States
   const [activeTab, setActiveTab] = useState<"explore" | "my-events">("explore");
@@ -152,17 +170,66 @@ export default function MenteeEvents() {
     }
   });
 
+  const refreshEvents = () => {
+    qc.invalidateQueries({ queryKey: ["mentee", "registrations", user?.id] });
+    qc.invalidateQueries({ queryKey: ["admin", "events"] });
+    qc.invalidateQueries({ queryKey: ["plus", "quota"] });
+  };
+
   const handleRegister = async (event: EventProgram, e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (!user?.id) return;
-    
+    setProcessingEventId(event.id);
     try {
+      // 1. Plus-eligible + active member with quota → register free with Plus.
+      if (canPlusEvent(event)) {
+        await bookPlusEvent.mutateAsync({ eventId: event.id });
+        refreshEvents();
+        toast({ title: "Registered with Plus!", description: "Your spot is confirmed." });
+        return;
+      }
+
+      // 2. Paid event → Cashfree checkout; the webhook creates the registration.
+      if ((event.price ?? 0) > 0) {
+        const res = await createEventOrder.mutateAsync({ eventId: event.id });
+        const cashfree = await getCashfree(res.cashfree_mode);
+        if (!cashfree?.checkout) {
+          toast({ variant: "destructive", title: "Payment unavailable", description: "Please try again." });
+          return;
+        }
+        const result = await cashfree.checkout({ paymentSessionId: res.payment_session_id, redirectTarget: "_modal" });
+        if (result?.error) {
+          toast({ variant: "destructive", title: "Payment not completed", description: result.error.message ?? "Please try again." });
+          return;
+        }
+        toast({ title: "Payment received", description: "Confirming your registration…" });
+        for (let i = 0; i < 6; i++) {
+          await new Promise((r) => setTimeout(r, 2000));
+          const { data } = await supabase
+            .from("event_participants")
+            .select("id")
+            .eq("event_id", event.id)
+            .eq("user_id", user.id)
+            .maybeSingle();
+          if (data) break;
+        }
+        refreshEvents();
+        return;
+      }
+
+      // 3. Free RSVP.
       await registerMutation.mutateAsync(event.id);
       if (event.registration_link) {
         window.open(event.registration_link, "_blank", "noopener,noreferrer");
       }
     } catch (err) {
-      console.error(err);
+      toast({
+        variant: "destructive",
+        title: "Couldn't register",
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setProcessingEventId(null);
     }
   };
 
@@ -388,6 +455,17 @@ export default function MenteeEvents() {
                             </span>
                           </div>
                         )}
+                        {(event.price ?? 0) > 0 && (
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-foreground">₹{eventPrice(event)}</span>
+                            {plusDiscount > 0 && <span className="line-through">₹{event.price}</span>}
+                          </div>
+                        )}
+                        {event.plus_eligible && (
+                          <div className="flex items-center gap-1.5 text-primary">
+                            <Sparkles className="h-3.5 w-3.5 shrink-0" /> Free with Plus
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -464,16 +542,15 @@ export default function MenteeEvents() {
                                   variant="default"
                                   className="text-xs h-8"
                                   onClick={(e) => handleRegister(event, e)}
-                                  disabled={registerMutation.isPending}
+                                  disabled={processingEventId === event.id}
                                 >
-                                  {event.registration_link ? (
-                                    <>
-                                      Register
-                                      <ExternalLink className="h-3 w-3 ml-1" />
-                                    </>
-                                  ) : (
-                                    "Register"
-                                  )}
+                                  {processingEventId === event.id
+                                    ? "Processing…"
+                                    : canPlusEvent(event)
+                                    ? "Register free (Plus)"
+                                    : (event.price ?? 0) > 0
+                                    ? `Register · ₹${eventPrice(event)}`
+                                    : "Register"}
                                 </Button>
                               )
                             ) : (
@@ -747,16 +824,13 @@ export default function MenteeEvents() {
                               handleRegister(selectedEvent);
                               setDetailOpen(false);
                             }}
-                            disabled={registerMutation.isPending}
+                            disabled={processingEventId === selectedEvent.id}
                           >
-                            {selectedEvent.registration_link ? (
-                              <>
-                                Register
-                                <ExternalLink className="h-3 w-3 ml-1" />
-                              </>
-                            ) : (
-                              "Register Now"
-                            )}
+                            {canPlusEvent(selectedEvent)
+                              ? "Register free with Plus"
+                              : (selectedEvent.price ?? 0) > 0
+                              ? `Register · ₹${eventPrice(selectedEvent)}`
+                              : "Register Now"}
                           </Button>
                         )
                       ) : (

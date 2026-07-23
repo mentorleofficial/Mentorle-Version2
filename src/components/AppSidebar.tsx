@@ -28,6 +28,8 @@ import {
   ListTodo,
   MessageCircle,
   Sparkles,
+  Wallet,
+  Coins,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -73,6 +75,8 @@ const AppSidebar = () => {
     { title: "Mentorship Listings", icon: Tag, path: "/admin/offerings" },
     { title: "Sessions", icon: BookOpen, path: "/admin/sessions" },
     { title: "Memberships", icon: Sparkles, path: "/admin/memberships" },
+    { title: "Withdrawals", icon: Wallet, path: "/admin/withdrawals" },
+    { title: "Mentor Earnings", icon: Coins, path: "/admin/mentor-earnings" },
     { title: "Events", icon: CalendarDays, path: "/admin/events" },
     { title: "Feedback", icon: Star, path: "/admin/feedback" },
     { title: "Platform Feedback", icon: MessageCircle, path: "/admin/general-feedback" },
@@ -91,6 +95,7 @@ const AppSidebar = () => {
     { title: "Programs", icon: FolderKanban, path: "/mentor/programs" },
     { title: "My Mentees", icon: UsersRound, path: "/mentor/mentees" },
     { title: "Bookings", icon: BookOpen, path: "/mentor/sessions" },
+    { title: "Earnings", icon: Wallet, path: "/mentor/earnings" },
     { title: "My Feedback", icon: MessageCircle, path: "/feedback" },
     ...(branding.leaderboard_enabled
       ? [{ title: "Leaderboard", icon: Trophy, path: "/mentor/leaderboard" }]
