@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -58,6 +59,7 @@ export interface MentorshipOffering {
   currency: string;
   duration_minutes: number;
   status: string;
+  plus_eligible: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -89,6 +91,7 @@ const MentorOfferings = () => {
   const [price, setPrice] = useState("0");
   const [status, setStatus] = useState("draft");
   const [category, setCategory] = useState("General Mentorship");
+  const [plusEligible, setPlusEligible] = useState(false);
 
   const { data: offerings = [], isLoading } = useQuery<MentorshipOffering[]>({
     queryKey: ["mentor", "offerings", user?.id],
@@ -118,6 +121,7 @@ const MentorOfferings = () => {
             price: payload.price,
             status: payload.status,
             category: payload.category,
+            plus_eligible: payload.plus_eligible,
             updated_at: new Date().toISOString(),
           })
           .eq("id", payload.id);
@@ -133,6 +137,7 @@ const MentorOfferings = () => {
             price: payload.price,
             status: payload.status,
             category: payload.category,
+            plus_eligible: payload.plus_eligible,
           });
         if (error) throw error;
       }
@@ -193,6 +198,7 @@ const MentorOfferings = () => {
     setPrice("0");
     setStatus("draft");
     setCategory("General Mentorship");
+    setPlusEligible(false);
   };
 
   const handleEdit = (o: MentorshipOffering) => {
@@ -203,6 +209,7 @@ const MentorOfferings = () => {
     setPrice(String(o.price));
     setStatus(o.status);
     setCategory(CATEGORIES.includes(o.category) ? o.category : "Other");
+    setPlusEligible(o.plus_eligible ?? false);
     setDialogOpen(true);
   };
 
@@ -221,6 +228,7 @@ const MentorOfferings = () => {
       status,
       category,
       currency: "INR",
+      plus_eligible: plusEligible,
     });
   };
 
@@ -515,6 +523,16 @@ const MentorOfferings = () => {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="space-y-0.5 pr-3">
+                  <Label htmlFor="plus-eligible">Available under Mentorle Plus</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Plus members can book this as one of their free monthly sessions — you're paid a % of the price.
+                  </p>
+                </div>
+                <Switch id="plus-eligible" checked={plusEligible} onCheckedChange={setPlusEligible} />
               </div>
             </form>
 

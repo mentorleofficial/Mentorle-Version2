@@ -148,8 +148,6 @@ export type Database = {
           accent_color: string
           app_name: string
           body_font: string
-          edubridge_enabled: boolean
-          edubridge_webhook_url: string
           heading_font: string
           id: string
           leaderboard_enabled: boolean
@@ -171,8 +169,6 @@ export type Database = {
           accent_color?: string
           app_name?: string
           body_font?: string
-          edubridge_enabled?: boolean
-          edubridge_webhook_url?: string
           heading_font?: string
           id?: string
           leaderboard_enabled?: boolean
@@ -194,8 +190,6 @@ export type Database = {
           accent_color?: string
           app_name?: string
           body_font?: string
-          edubridge_enabled?: boolean
-          edubridge_webhook_url?: string
           heading_font?: string
           id?: string
           leaderboard_enabled?: boolean
@@ -406,6 +400,8 @@ export type Database = {
           location: string | null
           metadata: Json | null
           online_url: string | null
+          plus_eligible: boolean
+          plus_price: number
           primary_organizer_id: string | null
           registration_close_at: string | null
           registration_open_at: string | null
@@ -431,6 +427,8 @@ export type Database = {
           location?: string | null
           metadata?: Json | null
           online_url?: string | null
+          plus_eligible?: boolean
+          plus_price?: number
           primary_organizer_id?: string | null
           registration_close_at?: string | null
           registration_open_at?: string | null
@@ -456,6 +454,8 @@ export type Database = {
           location?: string | null
           metadata?: Json | null
           online_url?: string | null
+          plus_eligible?: boolean
+          plus_price?: number
           primary_organizer_id?: string | null
           registration_close_at?: string | null
           registration_open_at?: string | null
@@ -491,7 +491,9 @@ export type Database = {
           max_participants: number | null
           meeting_link: string | null
           participant_count: number
+          plus_eligible: boolean
           prerequisites: string | null
+          price: number
           registration_deadline: string | null
           registration_link: string | null
           sessions: Json | null
@@ -525,7 +527,9 @@ export type Database = {
           max_participants?: number | null
           meeting_link?: string | null
           participant_count?: number
+          plus_eligible?: boolean
           prerequisites?: string | null
+          price?: number
           registration_deadline?: string | null
           registration_link?: string | null
           sessions?: Json | null
@@ -559,7 +563,9 @@ export type Database = {
           max_participants?: number | null
           meeting_link?: string | null
           participant_count?: number
+          plus_eligible?: boolean
           prerequisites?: string | null
+          price?: number
           registration_deadline?: string | null
           registration_link?: string | null
           sessions?: Json | null
@@ -825,6 +831,72 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      memberships: {
+        Row: {
+          auto_renew: boolean
+          cancel_at_period_end: boolean
+          cashfree_subscription_id: string | null
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          mandate_max_amount: number | null
+          plan_id: string | null
+          quota_anchor_day: number | null
+          started_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_renew?: boolean
+          cancel_at_period_end?: boolean
+          cashfree_subscription_id?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          mandate_max_amount?: number | null
+          plan_id?: string | null
+          quota_anchor_day?: number | null
+          started_at?: string | null
+          status: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_renew?: boolean
+          cancel_at_period_end?: boolean
+          cashfree_subscription_id?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          mandate_max_amount?: number | null
+          plan_id?: string | null
+          quota_anchor_day?: number | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memberships_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memberships_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       mentee_data: {
         Row: {
@@ -1316,6 +1388,63 @@ export type Database = {
           },
         ]
       }
+      mentor_earnings: {
+        Row: {
+          created_at: string
+          currency: string
+          fee_amount: number
+          gross_amount: number
+          id: string
+          mentor_id: string | null
+          net_amount: number
+          reference_id: string | null
+          source: string
+          status: string
+          withdrawal_request_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          fee_amount?: number
+          gross_amount: number
+          id?: string
+          mentor_id?: string | null
+          net_amount: number
+          reference_id?: string | null
+          source: string
+          status?: string
+          withdrawal_request_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          fee_amount?: number
+          gross_amount?: number
+          id?: string
+          mentor_id?: string | null
+          net_amount?: number
+          reference_id?: string | null
+          source?: string
+          status?: string
+          withdrawal_request_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mentor_earnings_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mentor_earnings_withdrawal_request_id_fkey"
+            columns: ["withdrawal_request_id"]
+            isOneToOne: false
+            referencedRelation: "withdrawal_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mentor_leaderboard_stats: {
         Row: {
           avg_rating_30d: number
@@ -1377,6 +1506,41 @@ export type Database = {
             columns: ["program_id"]
             isOneToOne: false
             referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mentor_payout_accounts: {
+        Row: {
+          created_at: string
+          details: Json
+          id: string
+          mentor_id: string
+          method: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          details: Json
+          id?: string
+          mentor_id: string
+          method: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json
+          id?: string
+          mentor_id?: string
+          method?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mentor_payout_accounts_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: true
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -1604,6 +1768,7 @@ export type Database = {
           max_bookings_per_day: number | null
           mentor_id: string
           min_notice_hours: number | null
+          plus_eligible: boolean
           preparation_notes: string | null
           price: number
           status: string
@@ -1630,6 +1795,7 @@ export type Database = {
           max_bookings_per_day?: number | null
           mentor_id: string
           min_notice_hours?: number | null
+          plus_eligible?: boolean
           preparation_notes?: string | null
           price?: number
           status?: string
@@ -1656,6 +1822,7 @@ export type Database = {
           max_bookings_per_day?: number | null
           mentor_id?: string
           min_notice_hours?: number | null
+          plus_eligible?: boolean
           preparation_notes?: string | null
           price?: number
           status?: string
@@ -1809,44 +1976,170 @@ export type Database = {
           },
         ]
       }
-      outbound_events: {
+      payment_settings: {
         Row: {
-          attempts: number
-          created_at: string
-          event_type: string
+          commission_percent: number
+          currency: string
           id: string
-          last_error: string
-          payload: Json
-          sent_at: string | null
-          status: Database["public"]["Enums"]["outbound_event_status"]
-          target_url: string
+          plus_discount_percent: number
+          plus_payout_percent: number
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
-          attempts?: number
-          created_at?: string
-          event_type: string
+          commission_percent?: number
+          currency?: string
           id?: string
-          last_error?: string
-          payload?: Json
-          sent_at?: string | null
-          status?: Database["public"]["Enums"]["outbound_event_status"]
-          target_url?: string
+          plus_discount_percent?: number
+          plus_payout_percent?: number
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
-          attempts?: number
-          created_at?: string
-          event_type?: string
+          commission_percent?: number
+          currency?: string
           id?: string
-          last_error?: string
-          payload?: Json
-          sent_at?: string | null
-          status?: Database["public"]["Enums"]["outbound_event_status"]
-          target_url?: string
+          plus_discount_percent?: number
+          plus_payout_percent?: number
           updated_at?: string
+          updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "payment_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          cashfree_order_id: string | null
+          cashfree_payment_session_id: string | null
+          created_at: string
+          currency: string
+          id: string
+          kind: string
+          payload: Json | null
+          reference_id: string | null
+          session_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          cashfree_order_id?: string | null
+          cashfree_payment_session_id?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          kind: string
+          payload?: Json | null
+          reference_id?: string | null
+          session_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          cashfree_order_id?: string | null
+          cashfree_payment_session_id?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          kind?: string
+          payload?: Json | null
+          reference_id?: string | null
+          session_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plus_session_usage: {
+        Row: {
+          accrued_amount: number
+          created_at: string
+          id: string
+          kind: string
+          list_price: number
+          membership_id: string
+          mentor_id: string | null
+          quota_period_end: string
+          quota_period_start: string
+          reference_id: string
+          user_id: string
+        }
+        Insert: {
+          accrued_amount: number
+          created_at?: string
+          id?: string
+          kind: string
+          list_price: number
+          membership_id: string
+          mentor_id?: string | null
+          quota_period_end: string
+          quota_period_start: string
+          reference_id: string
+          user_id: string
+        }
+        Update: {
+          accrued_amount?: number
+          created_at?: string
+          id?: string
+          kind?: string
+          list_price?: number
+          membership_id?: string
+          mentor_id?: string | null
+          quota_period_end?: string
+          quota_period_start?: string
+          reference_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plus_session_usage_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plus_session_usage_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plus_session_usage_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       post_comments: {
         Row: {
@@ -2376,6 +2669,109 @@ export type Database = {
           },
         ]
       }
+      slot_holds: {
+        Row: {
+          created_at: string
+          duration_minutes: number
+          expires_at: string
+          id: string
+          mentee_id: string
+          mentor_id: string
+          payment_id: string | null
+          scheduled_at: string
+        }
+        Insert: {
+          created_at?: string
+          duration_minutes: number
+          expires_at: string
+          id?: string
+          mentee_id: string
+          mentor_id: string
+          payment_id?: string | null
+          scheduled_at: string
+        }
+        Update: {
+          created_at?: string
+          duration_minutes?: number
+          expires_at?: string
+          id?: string
+          mentee_id?: string
+          mentor_id?: string
+          payment_id?: string | null
+          scheduled_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slot_holds_mentee_id_fkey"
+            columns: ["mentee_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slot_holds_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slot_holds_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_plans: {
+        Row: {
+          benefits: Json
+          cashfree_plan_id: string | null
+          created_at: string
+          currency: string
+          id: string
+          interval: string
+          is_active: boolean
+          max_amount: number | null
+          monthly_quota: number
+          name: string
+          price: number
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          benefits?: Json
+          cashfree_plan_id?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          interval: string
+          is_active?: boolean
+          max_amount?: number | null
+          monthly_quota?: number
+          name: string
+          price?: number
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          benefits?: Json
+          cashfree_plan_id?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          interval?: string
+          is_active?: boolean
+          max_amount?: number | null
+          monthly_quota?: number
+          name?: string
+          price?: number
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_consents: {
         Row: {
           accepted_at: string
@@ -2523,6 +2919,60 @@ export type Database = {
         }
         Relationships: []
       }
+      withdrawal_requests: {
+        Row: {
+          admin_note: string | null
+          amount: number
+          id: string
+          mentor_id: string | null
+          payment_reference: string | null
+          payout_account_snapshot: Json | null
+          processed_at: string | null
+          processed_by: string | null
+          requested_at: string
+          status: string
+        }
+        Insert: {
+          admin_note?: string | null
+          amount: number
+          id?: string
+          mentor_id?: string | null
+          payment_reference?: string | null
+          payout_account_snapshot?: Json | null
+          processed_at?: string | null
+          processed_by?: string | null
+          requested_at?: string
+          status?: string
+        }
+        Update: {
+          admin_note?: string | null
+          amount?: number
+          id?: string
+          mentor_id?: string | null
+          payment_reference?: string | null
+          payout_account_snapshot?: Json | null
+          processed_at?: string | null
+          processed_by?: string | null
+          requested_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "withdrawal_requests_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "withdrawal_requests_processed_by_fkey"
+            columns: ["processed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -2533,6 +2983,16 @@ export type Database = {
         Returns: boolean
       }
       check_email_exists: { Args: { email_to_check: string }; Returns: boolean }
+      consume_plus_session: {
+        Args: {
+          _kind: string
+          _list_price: number
+          _mentor_id: string
+          _reference_id: string
+          _user_id: string
+        }
+        Returns: string
+      }
       generate_mentor_slug: {
         Args: { _full_name: string; _user_id: string }
         Returns: string
@@ -2649,6 +3109,30 @@ export type Database = {
         Args: { _program_id: string; _user_id: string }
         Returns: boolean
       }
+      list_active_plans: {
+        Args: never
+        Returns: {
+          benefits: Json
+          cashfree_plan_id: string | null
+          created_at: string
+          currency: string
+          id: string
+          interval: string
+          is_active: boolean
+          max_amount: number | null
+          monthly_quota: number
+          name: string
+          price: number
+          slug: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "subscription_plans"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       list_public_mentors: {
         Args: never
         Returns: {
@@ -2678,6 +3162,41 @@ export type Database = {
           status: string
           title: string
         }[]
+      }
+      plus_quota_status: {
+        Args: never
+        Returns: {
+          discount_percent: number
+          has_membership: boolean
+          quota_remaining: number
+          quota_total: number
+          quota_used: number
+        }[]
+      }
+      plus_quota_window_start: {
+        Args: { _anchor_day: number; _today: string }
+        Returns: string
+      }
+      process_withdrawal: {
+        Args: {
+          _action: string
+          _note?: string
+          _reference?: string
+          _request_id: string
+        }
+        Returns: undefined
+      }
+      request_withdrawal: { Args: never; Returns: string }
+      reserve_slot: {
+        Args: {
+          _duration: number
+          _mentee_id: string
+          _mentor_id: string
+          _payment_id: string
+          _scheduled_at: string
+          _ttl_minutes: number
+        }
+        Returns: string
       }
     }
     Enums: {

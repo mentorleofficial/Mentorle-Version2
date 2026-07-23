@@ -30,3 +30,21 @@ verify_jwt = false
 
 [functions.refresh-mentor-engagement]
 verify_jwt = false
+
+# Payments / Plus. The user-facing functions verify the caller's JWT internally
+# (avoids gateway stale-token 401s, same as the review functions above).
+[functions.cashfree-create-order]
+verify_jwt = false
+
+[functions.cashfree-create-subscription]
+verify_jwt = false
+
+[functions.cashfree-cancel-subscription]
+verify_jwt = false
+
+[functions.book-plus-session]
+verify_jwt = false
+
+# Cashfree -> us: no user JWT; authenticated by HMAC signature inside the function.
+[functions.cashfree-webhook]
+verify_jwt = false

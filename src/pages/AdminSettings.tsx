@@ -5,6 +5,7 @@ import JwtSettings from "@/components/admin/JwtSettings";
 import PrivacySettings from "@/components/admin/PrivacySettings";
 import LeaderboardSettings from "@/components/admin/LeaderboardSettings";
 import ApplicationPolicySettings from "@/components/admin/ApplicationPolicySettings";
+import PaymentSettings from "@/components/admin/PaymentSettings";
 
 const AdminSettings = () => {
   return (
@@ -21,12 +22,14 @@ const AdminSettings = () => {
             <TabsTrigger value="privacy" className="shrink-0">Privacy</TabsTrigger>
             <TabsTrigger value="leaderboard" className="shrink-0">Leaderboard</TabsTrigger>
             <TabsTrigger value="applications" className="shrink-0">Applications</TabsTrigger>
+            <TabsTrigger value="payments" className="shrink-0">Payments</TabsTrigger>
           </TabsList>
           <TabsContent value="branding" className="mt-6"><BrandingSettings /></TabsContent>
           <TabsContent value="jwt" className="mt-6"><JwtSettings /></TabsContent>
           <TabsContent value="privacy" className="mt-6"><PrivacySettings /></TabsContent>
           <TabsContent value="leaderboard" className="mt-6"><LeaderboardSettings /></TabsContent>
           <TabsContent value="applications" className="mt-6"><ApplicationPolicySettings /></TabsContent>
+          <TabsContent value="payments" className="mt-6"><PaymentSettings /></TabsContent>
         </Tabs>
       </div>
     </AppLayout>

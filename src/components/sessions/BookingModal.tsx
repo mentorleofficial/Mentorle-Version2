@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, ChevronLeft, ChevronRight, Clock, Globe, Info, Video, Copy } from "lucide-react";
+import { CheckCircle, ChevronLeft, ChevronRight, Clock, Globe, Info, Video, Copy, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   getMonthMatrix,
@@ -32,6 +32,12 @@ import {
 } from "@/features/mentee-booking/useBookSessionData";
 import AddToCalendarMenu from "@/components/AddToCalendarMenu";
 import { markdownToHtml } from "@/components/ui/markdown-editor";
+import { useQueryClient } from "@tanstack/react-query";
+import { menteeSessionsKey } from "@/features/mentee-sessions/useMenteeSessions";
+import { useCreateSessionOrder, usePaymentStatus } from "@/features/payments/usePayments";
+import CashfreeCheckout from "@/features/payments/CashfreeCheckout";
+import type { CashfreeMode } from "@/features/payments/cashfree";
+import { usePlusQuota, useBookPlusSession } from "@/features/plus/usePlus";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -59,6 +65,12 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
   const { data: staticData, isPending } = useBookSessionStatic(open ? mentorId : undefined);
   const { data: bookedTimes = [] } = useBookedTimes(open ? mentorId : undefined, rescheduleSessionId ?? undefined);
   const bookMutation = useBookSession();
+  const qc = useQueryClient();
+  const createOrder = useCreateSessionOrder();
+  const { data: plusQuota } = usePlusQuota(!!user);
+  const bookPlus = useBookPlusSession();
+  const plusDiscount = plusQuota?.has_membership ? (plusQuota.discount_percent ?? 0) : 0;
+  const discounted = (p: number) => (plusDiscount > 0 ? Math.round(p * (1 - plusDiscount / 100) * 100) / 100 : p);
   const { data: menteePrograms = [] } = useMyPrograms();
   const [mentorProgramIds, setMentorProgramIds] = useState<string[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
@@ -106,8 +118,19 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
       setSelectedTime(null);
       setNotes("");
       setBookedSession(null);
+      setOrderInfo(null);
+      setPaymentSubmitted(false);
+      setConfirmTimedOut(false);
     }
   }, [open]);
+
+  // Refresh booked slots each time the modal opens so a session booked earlier this
+  // session (without a page reload) isn't shown as still-available.
+  useEffect(() => {
+    if (open && mentorId) {
+      qc.invalidateQueries({ queryKey: ["book-session", "booked-times", mentorId] });
+    }
+  }, [open, mentorId, qc]);
 
   const today = useMemo(() => {
     const t = new Date();
@@ -125,6 +148,10 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [bookedSession, setBookedSession] = useState<{ scheduledAt: Date; meetingUrl: string } | null>(null);
+  const [orderInfo, setOrderInfo] = useState<{ orderId: string; paymentSessionId: string; mode: CashfreeMode; scheduledAt: Date } | null>(null);
+  const [paymentSubmitted, setPaymentSubmitted] = useState(false);
+  const [confirmTimedOut, setConfirmTimedOut] = useState(false);
+  const paymentStatus = usePaymentStatus(orderInfo?.orderId ?? null, paymentSubmitted);
 
   const matrix = useMemo(
     () => getMonthMatrix(cursor.getFullYear(), cursor.getMonth()),
@@ -211,10 +238,96 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
 
   const booking = bookMutation.isPending;
 
+  useEffect(() => {
+    const st = paymentStatus.data;
+    if (!st || !orderInfo || bookedSession) return;
+    if (st.status === "paid" && st.session_id) {
+      (async () => {
+        const { data } = await supabase
+          .from("sessions")
+          .select("meeting_url")
+          .eq("id", st.session_id!)
+          .maybeSingle();
+        if (user) {
+          qc.invalidateQueries({ queryKey: menteeSessionsKey(user.id) });
+          qc.invalidateQueries({ queryKey: ["mentee-dashboard", user.id] });
+        }
+        toast({ title: "Payment successful!", description: "Your session is confirmed." });
+        setBookedSession({
+          scheduledAt: orderInfo.scheduledAt,
+          meetingUrl: (data as { meeting_url?: string } | null)?.meeting_url ?? "",
+        });
+      })();
+    } else if (st.status === "failed") {
+      toast({ variant: "destructive", title: "Payment failed", description: "Please try booking again." });
+      setOrderInfo(null);
+      setPaymentSubmitted(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentStatus.data, orderInfo, bookedSession]);
+
+  useEffect(() => {
+    if (!paymentSubmitted || bookedSession) return;
+    const t = setTimeout(() => setConfirmTimedOut(true), 90_000);
+    return () => clearTimeout(t);
+  }, [paymentSubmitted, bookedSession]);
+
+  const handlePlusBook = async () => {
+    if (!selectedDate || !selectedTime || !user || !mentorId || !selectedOffering) return;
+    const scheduledAt = toISTDate(selectedDate, selectedTime);
+    try {
+      const res = await bookPlus.mutateAsync({
+        offeringId: selectedOffering.id,
+        scheduledAt: scheduledAt.toISOString(),
+        durationMinutes: selectedOffering.duration_minutes,
+        title: selectedOffering.title || `Session with ${mentor?.full_name ?? "mentor"}`,
+        notes,
+      });
+      if (user) {
+        qc.invalidateQueries({ queryKey: menteeSessionsKey(user.id) });
+        qc.invalidateQueries({ queryKey: ["mentee-dashboard", user.id] });
+      }
+      toast({ title: "Booked with Plus!", description: "Your free session is confirmed." });
+      setBookedSession({ scheduledAt, meetingUrl: res.meeting_url });
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Couldn't book with Plus",
+        description: e instanceof Error ? e.message : "Please try again.",
+      });
+    }
+  };
+
   const handleBook = async () => {
     if (!selectedDate || !selectedTime || !user || !mentorId) return;
     const scheduledAt = toISTDate(selectedDate, selectedTime);
     const duration = selectedOffering?.duration_minutes ?? 30;
+
+    if (selectedOffering && selectedOffering.price > 0) {
+      try {
+        const res = await createOrder.mutateAsync({
+          offeringId: selectedOffering.id,
+          mentorId,
+          scheduledAt: scheduledAt.toISOString(),
+          durationMinutes: duration,
+          title: selectedOffering.title || `Session with ${mentor?.full_name ?? "mentor"}`,
+          notes,
+        });
+        setOrderInfo({
+          orderId: res.order_id,
+          paymentSessionId: res.payment_session_id,
+          mode: res.cashfree_mode,
+          scheduledAt,
+        });
+      } catch (e) {
+        toast({
+          variant: "destructive",
+          title: "Couldn't start payment",
+          description: e instanceof Error ? e.message : "Please try again.",
+        });
+      }
+      return;
+    }
 
     try {
       const { meetingUrl } = await bookMutation.mutateAsync({
@@ -266,8 +379,16 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
       : mentor?.current_role || mentor?.headline || null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-hidden p-0 gap-0 flex flex-col">
+    <Dialog open={open} onOpenChange={onOpenChange} modal={!orderInfo}>
+      <DialogContent
+        className="sm:max-w-3xl max-h-[90vh] overflow-hidden p-0 gap-0 flex flex-col"
+        onInteractOutside={(e) => {
+          if (orderInfo && !bookedSession) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (orderInfo && !bookedSession) e.preventDefault();
+        }}
+      >
         {bookedSession ? (
           <div className="p-6 space-y-4 overflow-y-auto">
             <DialogHeader>
@@ -309,6 +430,65 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
             <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>
               Close
             </Button>
+          </div>
+        ) : orderInfo ? (
+          <div className="p-6 space-y-4 overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-lg">Complete payment</DialogTitle>
+            </DialogHeader>
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">{selectedOffering?.title}</span>
+                <span className="font-semibold">
+                  ₹{selectedOffering ? discounted(selectedOffering.price) : ""}
+                  {plusDiscount > 0 && selectedOffering && (
+                    <>
+                      <span className="ml-1 text-xs font-normal text-muted-foreground line-through">
+                        ₹{selectedOffering.price}
+                      </span>
+                      <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                        {plusDiscount}% off
+                      </span>
+                    </>
+                  )}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {formatISTDateTime(orderInfo.scheduledAt)} · {selectedOffering?.duration_minutes} min
+              </p>
+            </div>
+            {paymentSubmitted ? (
+              confirmTimedOut ? (
+                <div className="flex flex-col items-center gap-2 py-8 text-center">
+                  <p className="text-sm font-medium">Still confirming your payment…</p>
+                  <p className="text-xs text-muted-foreground">
+                    If your payment went through, the session will appear in <strong>My Sessions</strong> shortly.
+                  </p>
+                  <Button variant="outline" size="sm" className="mt-1" onClick={() => onOpenChange(false)}>
+                    Close
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2 py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">Confirming your payment…</p>
+                  <p className="text-xs text-muted-foreground">This can take a few seconds.</p>
+                </div>
+              )
+            ) : (
+              <CashfreeCheckout
+                paymentSessionId={orderInfo.paymentSessionId}
+                mode={orderInfo.mode}
+                amountLabel={`₹${selectedOffering ? discounted(selectedOffering.price) : ""}`}
+                onPaid={() => { setConfirmTimedOut(false); setPaymentSubmitted(true); }}
+                onError={(msg) => toast({ variant: "destructive", title: "Payment failed", description: msg })}
+              />
+            )}
+            {!paymentSubmitted && (
+              <Button variant="ghost" className="w-full" onClick={() => setOrderInfo(null)}>
+                Cancel
+              </Button>
+            )}
           </div>
         ) : (
           <>
@@ -523,7 +703,7 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
                               <span className="font-medium text-foreground">{formatSlotLabel(selectedTime)}</span>
                               {slotEndForSelected && <> – {formatSlotLabel(slotEndForSelected)}</>}
                               {" "}· {selectedOffering.duration_minutes} min
-                              {selectedOffering.price > 0 && <> · ₹{selectedOffering.price}</>}
+                              {selectedOffering.price > 0 && <> · ₹{discounted(selectedOffering.price)}</>}
                             </div>
 
                             {sharedPrograms.length > 1 && (
@@ -554,14 +734,55 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
                               />
                             </div>
 
-                            <Button
-                              className="w-full"
-                              size="sm"
-                              onClick={handleBook}
-                              disabled={booking}
-                            >
-                              {booking ? "Booking…" : "Confirm Booking"}
-                            </Button>
+                            {selectedOffering.price > 0 && plusDiscount > 0 && (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-sm text-muted-foreground line-through">₹{selectedOffering.price}</span>
+                                <span className="text-lg font-semibold text-foreground">₹{discounted(selectedOffering.price)}</span>
+                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                                  {plusDiscount}% off with Plus
+                                </span>
+                              </div>
+                            )}
+                            {selectedOffering.plus_eligible && selectedOffering.price > 0 && plusQuota?.has_membership && (plusQuota?.quota_remaining ?? 0) > 0 ? (
+                              <div className="space-y-2">
+                                <Button className="w-full" size="sm" onClick={handlePlusBook} disabled={bookPlus.isPending}>
+                                  {bookPlus.isPending ? "Booking…" : `Book free with Plus · ${plusQuota.quota_remaining} left`}
+                                </Button>
+                                {selectedOffering.price > 0 && (
+                                  <Button
+                                    variant="outline"
+                                    className="w-full"
+                                    size="sm"
+                                    onClick={handleBook}
+                                    disabled={booking || createOrder.isPending}
+                                  >
+                                    {createOrder.isPending ? "Starting payment…" : `Pay ₹${discounted(selectedOffering.price)} instead`}
+                                  </Button>
+                                )}
+                              </div>
+                            ) : (
+                              <>
+                                {selectedOffering.plus_eligible && selectedOffering.price > 0 && plusQuota?.has_membership && plusQuota.quota_remaining === 0 && (
+                                  <p className="mb-2 text-xs text-muted-foreground">
+                                    You've used all {plusQuota.quota_total} free Plus sessions this month — book as paid below.
+                                  </p>
+                                )}
+                                <Button
+                                  className="w-full"
+                                  size="sm"
+                                  onClick={handleBook}
+                                  disabled={booking || createOrder.isPending}
+                                >
+                                  {createOrder.isPending
+                                    ? "Starting payment…"
+                                    : booking
+                                    ? "Booking…"
+                                    : selectedOffering.price > 0
+                                    ? `Proceed to payment · ₹${discounted(selectedOffering.price)}`
+                                    : "Confirm Booking"}
+                                </Button>
+                              </>
+                            )}
                           </div>
                         )}
                       </div>

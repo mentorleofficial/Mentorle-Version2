@@ -41,6 +41,7 @@ export interface BookingOffering {
   duration_minutes: number;
   price: number;
   category: string;
+  plus_eligible: boolean;
 }
 export interface BookSessionStaticData {
   mentor: BookingMentor | null;
@@ -85,7 +86,7 @@ export function useBookSessionStatic(mentorId?: string) {
           .order("date"),
         supabase
           .from("mentorship_offerings")
-          .select("id, title, description, duration_minutes, price, category")
+          .select("id, title, description, duration_minutes, price, category, plus_eligible")
           .eq("mentor_id", mentorId!)
           .eq("status", "active")
           .order("duration_minutes"),
