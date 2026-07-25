@@ -2,6 +2,8 @@ import { load } from "@cashfreepayments/cashfree-js";
 
 export type CashfreeMode = "sandbox" | "production";
 
+export type BrowsingContext = "_self" | "_blank" | "_parent" | "_top";
+
 export interface CashfreeComponent {
   mount: (selectorOrEl: string | HTMLElement) => void;
   unmount?: () => void;
@@ -21,12 +23,20 @@ export interface CashfreeInstance {
     paymentSessionId: string;
     returnUrl?: string;
   }) => Promise<CashfreePayResult>;
-  checkout?: (options: { paymentSessionId: string; redirectTarget?: string }) => Promise<{
+  checkout?: (options: {
+    paymentSessionId: string;
+    redirectTarget?: BrowsingContext | "_modal" | HTMLElement;
+  }) => Promise<{
     error?: { message?: string };
     paymentDetails?: { paymentMessage?: string };
     redirect?: boolean;
   }>;
-  subscriptionsCheckout?: (options: { subsSessionId: string; redirectTarget?: string }) => Promise<{
+  // Redirect-only: no "_modal" and no HTMLElement, and it resolves { redirect: true } as soon
+  // as the form is submitted — never with a payment result. Completion arrives via return_url.
+  subscriptionsCheckout?: (options: {
+    subsSessionId: string;
+    redirectTarget?: BrowsingContext;
+  }) => Promise<{
     error?: { message?: string };
     subscriptionDetails?: unknown;
     redirect?: boolean;
