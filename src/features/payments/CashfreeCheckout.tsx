@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, ShieldCheck } from "lucide-react";
-import { getCashfree, type CashfreeMode } from "./cashfree";
+import { getCashfree, openHostedCheckout, type CashfreeMode } from "./cashfree";
 
 interface CashfreeCheckoutProps {
   paymentSessionId: string;
@@ -22,6 +22,7 @@ export default function CashfreeCheckout({
   onError,
 }: CashfreeCheckoutProps) {
   const [launching, setLaunching] = useState(false);
+  const [interrupted, setInterrupted] = useState(false);
   const started = useRef(false);
 
   const launch = async () => {
@@ -34,11 +35,13 @@ export default function CashfreeCheckout({
       }
       const result = await cashfree.checkout({ paymentSessionId, redirectTarget: "_modal" });
       if (result?.error) {
+        setInterrupted(true);
         onError(result.error.message ?? "Payment was not completed.");
         return;
       }
       onPaid();
     } catch (e) {
+      setInterrupted(true);
       onError(e instanceof Error ? e.message : "Payment failed");
     } finally {
       setLaunching(false);
@@ -77,6 +80,39 @@ export default function CashfreeCheckout({
       <p className="text-center text-xs text-muted-foreground">
         A secure Cashfree window opens to pay by card, UPI, net banking, or wallet.
       </p>
+
+      {/* Cashfree's overlay pins itself to z-index 2147483647, so nothing here is reachable while
+          it is open — this only becomes visible once the user closes it, which is exactly when a
+          blocked bank popup has left them stuck. Their own in-modal fallback link cannot work: it
+          re-invokes checkout with the original "_modal" target and simply rebuilds the modal. */}
+      {interrupted ? (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
+          <p className="text-xs font-medium text-foreground">Didn't reach your bank's page?</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Some browsers block the payment window. Open it in this tab instead — your payment is
+            still valid.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-2 w-full"
+            onClick={() => void openHostedCheckout(mode, paymentSessionId)}
+          >
+            Open payment page
+          </Button>
+        </div>
+      ) : (
+        <p className="text-center text-xs text-muted-foreground">
+          Bank page blocked by your browser?{" "}
+          <button
+            type="button"
+            onClick={() => void openHostedCheckout(mode, paymentSessionId)}
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            Open the payment page instead
+          </button>
+        </p>
+      )}
     </div>
   );
 }

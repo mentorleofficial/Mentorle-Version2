@@ -41,6 +41,8 @@ export function useCreateSessionOrder() {
           duration_minutes: input.durationMinutes,
           title: input.title,
           notes: input.notes ?? "",
+          // Only used if the hosted-checkout fallback is taken; the modal path never leaves.
+          return_url: paymentReturnUrl("/mentee/sessions"),
         },
       });
       if (error) throw new Error(await invokeErrorMessage(error));
