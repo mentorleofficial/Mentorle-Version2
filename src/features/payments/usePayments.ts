@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { CashfreeMode } from "./cashfree";
+import { paymentReturnUrl } from "./returnUrl";
 
 export interface CreateSessionOrderInput {
   offeringId: string;
@@ -53,7 +54,7 @@ export function useCreateEventOrder() {
   return useMutation<CreateOrderResult, Error, { eventId: string }>({
     mutationFn: async ({ eventId }) => {
       const { data, error } = await supabase.functions.invoke("cashfree-create-order", {
-        body: { kind: "event", event_id: eventId, return_url: window.location.href },
+        body: { kind: "event", event_id: eventId, return_url: paymentReturnUrl() },
       });
       if (error) throw new Error(await invokeErrorMessage(error));
       if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);

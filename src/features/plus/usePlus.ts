@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { paymentReturnUrl } from "@/features/payments/returnUrl";
 
 export interface Plan {
   id: string;
@@ -85,7 +86,7 @@ export function useCreateSubscription() {
   return useMutation<CreateSubscriptionResult, Error, { planId: string }>({
     mutationFn: async ({ planId }) => {
       const { data, error } = await supabase.functions.invoke("cashfree-create-subscription", {
-        body: { plan_id: planId, return_url: `${window.location.origin}/mentee/plus` },
+        body: { plan_id: planId, return_url: paymentReturnUrl("/mentee/plus") },
       });
       if (error) {
         let msg = error.message;

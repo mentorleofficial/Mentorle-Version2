@@ -2,6 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": false,
   "trailingSlash": false,
+  "redirects": [
+    { "source": "/pay-return/:path*", "destination": "/:path*", "statusCode": 303 }
+  ],
   "rewrites": [
     { "source": "/((?!assets/|.*\\.(?:js|css|map|json|png|jpg|jpeg|gif|svg|webp|avif|ico|woff|woff2|ttf|otf|eot|mp4|webm|mp3|wav|pdf|txt|xml|wasm)$).*)", "destination": "/index.html" }
   ],

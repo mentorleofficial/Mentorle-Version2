@@ -40,11 +40,50 @@ const defaultBranding: BrandingConfig = {
 
 const BrandingContext = createContext<BrandingConfig>(defaultBranding);
 
+const LIGHT_FG = "0 0% 100%";
+const DARK_FG = "220 25% 10%";
+
+const relativeLuminance = (hsl: string): number | null => {
+  const m = hsl.match(/^\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\s*$/);
+  if (!m) return null;
+  const h = Number(m[1]) % 360;
+  const s = Number(m[2]) / 100;
+  const l = Number(m[3]) / 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const rgb = [
+    [c, x, 0],
+    [x, c, 0],
+    [0, c, x],
+    [0, x, c],
+    [x, 0, c],
+    [c, 0, x],
+  ][Math.floor(h / 60)];
+  const [r, g, b] = rgb.map((v) => {
+    const channel = v + (l - c / 2);
+    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+// Branding only stores background colours, so the paired -foreground vars would keep whatever
+// index.css hardcoded — white text on a light branded accent renders invisible on every
+// outline/ghost hover. Pick whichever of light/dark contrasts better against the actual colour.
+const readableForeground = (hsl: string): string => {
+  const lum = relativeLuminance(hsl);
+  if (lum === null) return LIGHT_FG;
+  const contrast = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  return contrast(lum, relativeLuminance(DARK_FG)!) > contrast(lum, 1) ? DARK_FG : LIGHT_FG;
+};
+
 export const applyBrandingToDom = (config: BrandingConfig) => {
   const root = document.documentElement;
   root.style.setProperty("--primary", config.primary_color);
+  root.style.setProperty("--primary-foreground", readableForeground(config.primary_color));
   root.style.setProperty("--secondary", config.secondary_color);
+  root.style.setProperty("--secondary-foreground", readableForeground(config.secondary_color));
   root.style.setProperty("--accent", config.accent_color);
+  root.style.setProperty("--accent-foreground", readableForeground(config.accent_color));
   root.style.setProperty("--sidebar-background", config.sidebar_background);
   root.style.setProperty("--sidebar-foreground", config.sidebar_foreground);
   root.style.setProperty("--sidebar-primary", config.sidebar_primary);
