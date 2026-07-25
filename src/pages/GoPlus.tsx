@@ -50,9 +50,12 @@ const GoPlus = () => {
         toast({ variant: "destructive", title: "Payment unavailable", description: "Please try again shortly." });
         return;
       }
+      // subscriptionsCheckout has no modal mode (unlike checkout) — it form-POSTs the session
+      // and uses redirectTarget verbatim as the form target, so only real browsing contexts
+      // work. Anything else silently POSTs into a stray named window and renders blank.
       const result = await cashfree.subscriptionsCheckout({
         subsSessionId: res.subscription_session_id,
-        redirectTarget: "_modal",
+        redirectTarget: "_self",
       });
       if (result?.error) {
         toast({
