@@ -58,7 +58,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { usePlusQuota, useBookPlusEvent } from "@/features/plus/usePlus";
 import { useCreateEventOrder } from "@/features/payments/usePayments";
-import { getCashfree } from "@/features/payments/cashfree";
+import { getCashfree, openHostedCheckout } from "@/features/payments/cashfree";
+import { ToastAction } from "@/components/ui/toast";
 
 export default function MenteeEvents() {
   const { user } = useAuth();
@@ -197,6 +198,21 @@ export default function MenteeEvents() {
           toast({ variant: "destructive", title: "Payment unavailable", description: "Please try again." });
           return;
         }
+        // The modal cannot surface a working fallback of its own (Cashfree's blocked-popup link
+        // sits in a cross-origin iframe), so offer the hosted page alongside it.
+        toast({
+          title: "Complete your payment",
+          description: "If your browser blocks the bank page, open the payment page directly.",
+          duration: 120000,
+          action: (
+            <ToastAction
+              altText="Open payment page"
+              onClick={() => void openHostedCheckout(res.cashfree_mode, res.payment_session_id)}
+            >
+              Open page
+            </ToastAction>
+          ),
+        });
         const result = await cashfree.checkout({ paymentSessionId: res.payment_session_id, redirectTarget: "_modal" });
         if (result?.error) {
           toast({ variant: "destructive", title: "Payment not completed", description: result.error.message ?? "Please try again." });

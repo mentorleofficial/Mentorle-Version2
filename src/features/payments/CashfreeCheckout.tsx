@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, ShieldCheck } from "lucide-react";
-import { getCashfree, type CashfreeMode } from "./cashfree";
+import { getCashfree, openHostedCheckout, type CashfreeMode } from "./cashfree";
 
 interface CashfreeCheckoutProps {
   paymentSessionId: string;
@@ -76,6 +76,17 @@ export default function CashfreeCheckout({
 
       <p className="text-center text-xs text-muted-foreground">
         A secure Cashfree window opens to pay by card, UPI, net banking, or wallet.
+      </p>
+
+      <p className="text-center text-xs text-muted-foreground">
+        Bank page blocked by your browser?{" "}
+        <button
+          type="button"
+          onClick={() => void openHostedCheckout(mode, paymentSessionId)}
+          className="underline underline-offset-2 hover:text-foreground"
+        >
+          Open the payment page instead
+        </button>
       </p>
     </div>
   );
