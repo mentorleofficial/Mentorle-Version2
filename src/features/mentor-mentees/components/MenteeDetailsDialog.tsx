@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { useMenteeDetailsForMentor } from "../useMentorMentees";
 import { formatTimeWindow } from "@/features/mentee-onboarding/profileOptions";
+import PlusMemberBadge from "@/components/plus/PlusMemberBadge";
+import { useMenteeIsPlusMember } from "@/features/plus/usePlus";
 
 interface MenteeDetailsDialogProps {
   menteeId: string | null;
@@ -40,6 +42,7 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
 
 export const MenteeDetailsDialog = ({ menteeId, open, onOpenChange }: MenteeDetailsDialogProps) => {
   const { data: profile, isLoading, error } = useMenteeDetailsForMentor(menteeId);
+  const { data: isPlus } = useMenteeIsPlusMember(open ? menteeId : null);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -68,7 +71,10 @@ export const MenteeDetailsDialog = ({ menteeId, open, onOpenChange }: MenteeDeta
                 )}
               </div>
               <div className="min-w-0">
-                <h3 className="text-base font-semibold truncate">{profile.full_name}</h3>
+                <h3 className="text-base font-semibold truncate flex flex-wrap items-center gap-1.5">
+                  {profile.full_name}
+                  {isPlus && <PlusMemberBadge label="Plus member" />}
+                </h3>
                 {profile.headline ? (
                   <p className="text-sm text-muted-foreground mt-0.5 truncate">{profile.headline}</p>
                 ) : (

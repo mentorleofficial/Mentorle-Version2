@@ -2,7 +2,14 @@ import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
-import { useActivePlans, useMyMembership, useCreateSubscription, useCancelSubscription, usePlusQuota } from "@/features/plus/usePlus";
+import {
+  useActivePlans,
+  useMyMembership,
+  useCreateSubscription,
+  useCancelSubscription,
+  useUpgradeToYearly,
+  usePlusQuota,
+} from "@/features/plus/usePlus";
 import { getCashfree } from "@/features/payments/cashfree";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,10 +36,19 @@ const GoPlus = () => {
   const { data: membership } = useMyMembership(user?.id, activating);
   const { data: quota } = usePlusQuota(!!user);
   const subscribe = useCreateSubscription();
+  const upgrade = useUpgradeToYearly();
   const cancel = useCancelSubscription();
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
 
+  const isMember = membership?.status === "active" || membership?.status === "past_due";
   const isActive = membership?.status === "active";
+  const planInterval = membership?.plan?.interval;
+  const isMonthlyMember = isMember && planInterval === "month";
+  const yearlyPlan = plans.find((p) => p.interval === "year");
+  const memberBenefits =
+    membership?.plan?.benefits?.length
+      ? membership.plan.benefits
+      : yearlyPlan?.benefits ?? plans[0]?.benefits ?? [];
 
   useEffect(() => {
     if (activating && membership?.status === "active") {
@@ -41,18 +57,18 @@ const GoPlus = () => {
     }
   }, [activating, membership?.status, toast]);
 
-  const handleSubscribe = async (planId: string) => {
+  const startCheckout = async (
+    planId: string,
+    start: (args: { planId: string }) => Promise<{ subscription_session_id: string; cashfree_mode: "sandbox" | "production" }>,
+  ) => {
     setPendingPlanId(planId);
     try {
-      const res = await subscribe.mutateAsync({ planId });
+      const res = await start({ planId });
       const cashfree = await getCashfree(res.cashfree_mode);
       if (!cashfree?.subscriptionsCheckout) {
         toast({ variant: "destructive", title: "Payment unavailable", description: "Please try again shortly." });
         return;
       }
-      // subscriptionsCheckout has no modal mode (unlike checkout) — it form-POSTs the session
-      // and uses redirectTarget verbatim as the form target, so only real browsing contexts
-      // work. Anything else silently POSTs into a stray named window and renders blank.
       const result = await cashfree.subscriptionsCheckout({
         subsSessionId: res.subscription_session_id,
         redirectTarget: "_self",
@@ -65,7 +81,7 @@ const GoPlus = () => {
         });
         return;
       }
-      setActivating(true); // the subscription webhook flips the membership to active — poll for it
+      setActivating(true);
     } catch (e) {
       toast({
         variant: "destructive",
@@ -76,6 +92,9 @@ const GoPlus = () => {
       setPendingPlanId(null);
     }
   };
+
+  const handleSubscribe = (planId: string) => startCheckout(planId, (a) => subscribe.mutateAsync(a));
+  const handleUpgrade = (planId: string) => startCheckout(planId, (a) => upgrade.mutateAsync(a));
 
   const doCancel = async (atPeriodEnd: boolean) => {
     try {
@@ -102,10 +121,21 @@ const GoPlus = () => {
           <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
             <Sparkles className="h-3.5 w-3.5" /> Mentorle Plus
           </div>
-          <h1 className="text-3xl font-semibold tracking-tight">Unlock more with Plus</h1>
-          <p className="text-muted-foreground">
-            2 free expert sessions every month, better discounts, premium resources, and more.
-          </p>
+          {isMember ? (
+            <>
+              <h1 className="text-3xl font-semibold tracking-tight">You're on Mentorle Plus</h1>
+              <p className="text-muted-foreground">
+                Enjoy your benefits — free sessions, discounts, and more.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-3xl font-semibold tracking-tight">Unlock more with Plus</h1>
+              <p className="text-muted-foreground">
+                2 free expert sessions every month, better discounts, premium resources, and more.
+              </p>
+            </>
+          )}
         </div>
 
         {membership && (
@@ -117,6 +147,11 @@ const GoPlus = () => {
                   <Badge variant={isActive ? "default" : "secondary"} className="capitalize">
                     {membership.status}
                   </Badge>
+                  {membership.plan?.interval && (
+                    <Badge variant="outline" className="capitalize text-xs">
+                      {membership.plan.interval === "year" ? "Yearly" : "Monthly"}
+                    </Badge>
+                  )}
                 </p>
                 {membership.current_period_end && (
                   <p className="mt-0.5 text-sm text-muted-foreground">
@@ -180,7 +215,63 @@ const GoPlus = () => {
           </p>
         )}
 
-        {isLoading ? (
+        {isMember ? (
+          <div className="space-y-5">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Your Plus benefits</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {memberBenefits.map((b, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+
+            {isMonthlyMember && yearlyPlan && (
+              <Card className="border-primary/30">
+                <CardHeader>
+                  <CardTitle className="text-lg">Upgrade to yearly</CardTitle>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-semibold">₹{yearlyPlan.price}</span>
+                    <span className="text-sm text-muted-foreground">/ year</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Switch to yearly billing. Your monthly plan will be cancelled and you'll set up a new yearly mandate.
+                  </p>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  <ul className="space-y-2">
+                    {yearlyPlan.benefits.map((b, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <span>{b}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button
+                    className="w-full"
+                    disabled={pendingPlanId === yearlyPlan.id}
+                    onClick={() => handleUpgrade(yearlyPlan.id)}
+                  >
+                    {pendingPlanId === yearlyPlan.id ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Starting…
+                      </>
+                    ) : (
+                      "Upgrade to yearly"
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        ) : isLoading ? (
           <p className="py-8 text-center text-muted-foreground">Loading plans…</p>
         ) : plans.length === 0 ? (
           <p className="py-8 text-center text-muted-foreground">No plans are available right now.</p>
@@ -206,12 +297,10 @@ const GoPlus = () => {
                   </ul>
                   <Button
                     className="w-full"
-                    disabled={isActive || pendingPlanId === plan.id}
+                    disabled={pendingPlanId === plan.id}
                     onClick={() => handleSubscribe(plan.id)}
                   >
-                    {isActive ? (
-                      "You're on Plus"
-                    ) : pendingPlanId === plan.id ? (
+                    {pendingPlanId === plan.id ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Starting…
                       </>

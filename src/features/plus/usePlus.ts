@@ -14,6 +14,13 @@ export interface Plan {
   is_active: boolean;
 }
 
+export interface MembershipPlan {
+  interval: "month" | "year";
+  name: string;
+  benefits: string[];
+  price: number;
+}
+
 export interface Membership {
   id: string;
   plan_id: string | null;
@@ -21,6 +28,7 @@ export interface Membership {
   current_period_end: string | null;
   auto_renew: boolean;
   cancel_at_period_end: boolean;
+  plan: MembershipPlan | null;
 }
 
 export function useActivePlans() {
@@ -63,14 +71,34 @@ export function useMyMembership(userId?: string, poll = false) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("memberships")
-        .select("id, plan_id, status, current_period_end, auto_renew, cancel_at_period_end")
+        .select(
+          "id, plan_id, status, current_period_end, auto_renew, cancel_at_period_end, subscription_plans(interval, name, benefits, price)",
+        )
         .eq("user_id", userId!)
         .in("status", ["pending", "active", "past_due"])
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
       if (error) throw error;
-      return (data as Membership) ?? null;
+      if (!data) return null;
+      const row = data as Record<string, unknown>;
+      const rawPlan = row.subscription_plans as Record<string, unknown> | null;
+      return {
+        id: row.id as string,
+        plan_id: (row.plan_id as string) ?? null,
+        status: row.status as string,
+        current_period_end: (row.current_period_end as string) ?? null,
+        auto_renew: !!row.auto_renew,
+        cancel_at_period_end: !!row.cancel_at_period_end,
+        plan: rawPlan
+          ? {
+              interval: rawPlan.interval as "month" | "year",
+              name: rawPlan.name as string,
+              benefits: Array.isArray(rawPlan.benefits) ? (rawPlan.benefits as string[]) : [],
+              price: Number(rawPlan.price ?? 0),
+            }
+          : null,
+      } satisfies Membership;
     },
   });
 }
@@ -227,6 +255,50 @@ export function useCancelSubscription() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["plus", "membership"] });
+    },
+  });
+}
+
+async function invokeErrorMessage(error: { message: string; context?: { json?: () => Promise<{ error?: string }> } }) {
+  let msg = error.message;
+  try {
+    const body = await error.context?.json?.();
+    if (body?.error) msg = body.error;
+  } catch {
+    // keep generic message
+  }
+  return msg;
+}
+
+export function useUpgradeToYearly() {
+  const qc = useQueryClient();
+  return useMutation<CreateSubscriptionResult, Error, { planId: string }>({
+    mutationFn: async ({ planId }) => {
+      const { data, error } = await supabase.functions.invoke("cashfree-upgrade-subscription", {
+        body: { plan_id: planId, return_url: paymentReturnUrl("/mentee/plus") },
+      });
+      if (error) throw new Error(await invokeErrorMessage(error));
+      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+      return data as CreateSubscriptionResult;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["plus", "membership"] });
+      qc.invalidateQueries({ queryKey: ["plus", "quota"] });
+    },
+  });
+}
+
+export function useMenteeIsPlusMember(menteeId?: string | null) {
+  return useQuery<boolean>({
+    queryKey: ["plus", "mentee-is-member", menteeId],
+    enabled: !!menteeId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("mentee_is_plus_member", {
+        p_mentee_id: menteeId!,
+      });
+      if (error) throw error;
+      return !!data;
     },
   });
 }

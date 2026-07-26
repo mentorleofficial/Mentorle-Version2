@@ -3173,6 +3173,10 @@ export type Database = {
           quota_used: number
         }[]
       }
+      mentee_is_plus_member: {
+        Args: { p_mentee_id: string }
+        Returns: boolean
+      }
       plus_quota_window_start: {
         Args: { _anchor_day: number; _today: string }
         Returns: string

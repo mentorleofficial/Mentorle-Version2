@@ -48,6 +48,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useOpenActionItemsCount } from "@/features/action-items/useActionItems";
+import { usePlusQuota } from "@/features/plus/usePlus";
 
 const AppSidebar = () => {
   const { profile, signOut, mentorActive, isApproved, profileCompleteness } = useAuth();
@@ -111,6 +112,7 @@ const AppSidebar = () => {
   ];
 
   const { data: openTasksCount = 0 } = useOpenActionItemsCount(profile?.id, "mentee");
+  const { data: plusQuota } = usePlusQuota(role === "mentee");
 
   const menteeItems = [
     { title: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
@@ -120,7 +122,12 @@ const AppSidebar = () => {
     { title: "Find Mentors", icon: GraduationCap, path: "/mentors" },
     { title: "Book Session", icon: CalendarPlus, path: "/mentee/book" },
     { title: "My Sessions", icon: BookOpen, path: "/mentee/sessions" },
-    { title: "Mentorle Plus", icon: Sparkles, path: "/mentee/plus" },
+    {
+      title: "Mentorle Plus",
+      icon: Sparkles,
+      path: "/mentee/plus",
+      badge: plusQuota?.has_membership ? "Member" : undefined,
+    },
     { title: "My Tasks", icon: ListTodo, path: "/mentee/tasks", badge: openTasksCount || undefined },
     { title: "My Feedback", icon: MessageCircle, path: "/feedback" },
     { title: "Privacy & My Data", icon: Shield, path: "/account/privacy" },

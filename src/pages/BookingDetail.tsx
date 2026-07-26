@@ -19,6 +19,8 @@ import {
   type SessionStatus,
 } from "@/features/mentor-sessions/useMentorSessions";
 import { MenteeDetailsDialog } from "@/features/mentor-mentees/components/MenteeDetailsDialog";
+import PlusMemberBadge from "@/components/plus/PlusMemberBadge";
+import { useMenteeIsPlusMember } from "@/features/plus/usePlus";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -102,6 +104,7 @@ const BookingDetail = () => {
   const { data: booking, isLoading, error } = useBookingDetail(sessionIdToLoad);
   const updateStatus = useUpdateSessionStatus(user?.id);
   const updateDetails = useUpdateSessionDetails(user?.id);
+  const { data: menteeIsPlus } = useMenteeIsPlusMember(booking?.mentee_id);
 
   const [meetingUrl, setMeetingUrl] = useState<string | null>(null);
   const [notes, setNotes] = useState<string | null>(null);
@@ -396,7 +399,10 @@ const BookingDetail = () => {
                     <AvatarFallback>{initialsOf(menteeName)}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
-                    <p className="font-medium truncate">{menteeName}</p>
+                    <p className="font-medium truncate flex flex-wrap items-center gap-1.5">
+                      {menteeName}
+                      {menteeIsPlus && <PlusMemberBadge label="Plus member" />}
+                    </p>
                     {booking.mentee?.email && (
                       <a
                         href={`mailto:${booking.mentee.email}`}

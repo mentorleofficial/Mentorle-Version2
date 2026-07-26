@@ -42,6 +42,9 @@ verify_jwt = false
 [functions.cashfree-cancel-subscription]
 verify_jwt = false
 
+[functions.cashfree-upgrade-subscription]
+verify_jwt = false
+
 [functions.book-plus-session]
 verify_jwt = false
 

@@ -1,6 +1,6 @@
 
 import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMenteeProfileStatus } from "@/features/mentee-onboarding/hooks/useMenteeProfileStatus";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -10,8 +10,6 @@ import { Sparkles, Star } from "lucide-react";
 import { useMyPrograms } from "@/features/programs/hooks/useMyPrograms";
 import { useMenteeDashboardData } from "@/features/mentee-dashboard/useMenteeDashboardData";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -24,6 +22,8 @@ import InsightsPanel from "./mentee/InsightsPanel";
 import RecommendedMentors from "./mentee/RecommendedMentors";
 import RecentActivity from "./mentee/RecentActivity";
 import MenteeFeedbackSurvey from "@/components/feedback/MenteeFeedbackSurvey";
+import PlusMemberBadge from "@/components/plus/PlusMemberBadge";
+import { usePlusQuota } from "@/features/plus/usePlus";
 
 const MenteeDashboard = () => {
   const { user, profile } = useAuth();
@@ -35,6 +35,7 @@ const MenteeDashboard = () => {
   const { data: programs = [] } = useMyPrograms();
   const { data: registrations = [] } = useMenteeRegistrations(user?.id);
   const { data: events = [] } = useAllEvents();
+  const { data: plusQuota } = usePlusQuota(!!user);
 
   const registeredUpcomingEvents = useMemo(() => {
     const registeredIds = new Set(registrations.map((r) => r.event_id));
@@ -146,13 +147,44 @@ const MenteeDashboard = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold" style={{ fontFamily: "var(--font-serif)" }}>
+        <h2 className="text-2xl font-semibold flex flex-wrap items-center gap-2" style={{ fontFamily: "var(--font-serif)" }}>
           Welcome back, {firstName}!
+          {plusQuota?.has_membership && <PlusMemberBadge linkToPlus label="Plus member" />}
         </h2>
         <p className="text-sm text-muted-foreground">
           Here's your learning journey overview
         </p>
       </div>
+
+      {plusQuota?.has_membership && (
+        <Card className="border-primary/25 bg-primary/5">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-medium flex flex-wrap items-center gap-2">
+                  Mentorle Plus member
+                  <PlusMemberBadge label="Active" />
+                </p>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  <span className="font-medium text-foreground">
+                    {plusQuota.quota_remaining} of {plusQuota.quota_total}
+                  </span>{" "}
+                  free sessions left this month
+                  {plusQuota.discount_percent > 0
+                    ? ` · ${plusQuota.discount_percent}% off eligible bookings`
+                    : ""}
+                </p>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/mentee/plus">Manage Plus</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <NextSessionCard session={computed.next} />
 
