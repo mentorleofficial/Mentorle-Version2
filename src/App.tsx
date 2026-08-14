@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { BrandingProvider } from "@/contexts/BrandingContext";
+import { StickyActionBarProvider } from "@/contexts/StickyActionBarContext";
 import RoleGuard from "@/components/RoleGuard";
 import MenteeOnboardingGuard from "@/components/MenteeOnboardingGuard";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -73,6 +74,7 @@ const App = () => (
         <BrowserRouter>
           <BrandingProvider>
             <AuthProvider>
+              <StickyActionBarProvider>
               <Suspense fallback={<RouteFallback />}>
                 <Routes>
                   <Route path="/" element={<Navigate to="/login" replace />} />
@@ -134,6 +136,7 @@ const App = () => (
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
+              </StickyActionBarProvider>
             </AuthProvider>
           </BrandingProvider>
         </BrowserRouter>

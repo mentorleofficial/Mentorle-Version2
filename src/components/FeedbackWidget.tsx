@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import { MessageCircle, AlertCircle, Lightbulb, Star, Send, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useStickyActionBarHeight } from "@/contexts/StickyActionBarContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -23,6 +24,7 @@ const MAX_LEN = 1000;
 const FeedbackWidget = () => {
   const { user, role } = useAuth();
   const location = useLocation();
+  const actionBarHeight = useStickyActionBarHeight();
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState<Category>("feedback");
   const [message, setMessage] = useState("");
@@ -60,7 +62,8 @@ const FeedbackWidget = () => {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Share feedback"
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 rounded-full bg-primary text-primary-foreground shadow-lg ring-1 ring-primary/20 pl-5 pr-6 py-3 transition-all hover:scale-105 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        style={{ bottom: actionBarHeight + 24 }}
+        className="fixed right-6 z-50 flex items-center gap-2.5 rounded-full bg-primary text-primary-foreground shadow-lg ring-1 ring-primary/20 pl-5 pr-6 py-3 transition-all hover:scale-105 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <MessageCircle className="h-5 w-5" />
         <span className="font-medium text-sm">Feedback</span>
