@@ -12,7 +12,22 @@
       "Bash(npx --yes supabase functions deploy send-booking-email --project-ref xykindgwltvgcrcuwmik)",
       "Bash(npx --yes supabase functions deploy export-user-data --project-ref xykindgwltvgcrcuwmik)",
       "Bash(npx --yes supabase functions deploy refresh-mentor-engagement --project-ref xykindgwltvgcrcuwmik)",
-      "PowerShell(cd \"c:\\\\Programming\\\\BeezTech\\\\Mentorle-Version2\"; $secret = -join \\(\\(1..48\\) | ForEach-Object { \"0123456789abcdef\"[\\(Get-Random -Max 16\\)] }\\); npx --yes supabase secrets set \"CRON_SECRET=$secret\" --project-ref xykindgwltvgcrcuwmik 2>&1 | Out-String; \"CRON_SECRET value \\(save for the cron reschedule snippet\\): $secret\")"
+      "PowerShell(cd \"c:\\\\Programming\\\\BeezTech\\\\Mentorle-Version2\"; $secret = -join \\(\\(1..48\\) | ForEach-Object { \"0123456789abcdef\"[\\(Get-Random -Max 16\\)] }\\); npx --yes supabase secrets set \"CRON_SECRET=$secret\" --project-ref xykindgwltvgcrcuwmik 2>&1 | Out-String; \"CRON_SECRET value \\(save for the cron reschedule snippet\\): $secret\")",
+      "Bash(npx tsc *)",
+      "Bash(npx vitest *)",
+      "Bash(npx kill-port *)",
+      "Bash(rm -rf __harness)",
+      "Bash(echo \"TSC:$?\")",
+      "Bash(sed -i 's|import MentorSessions from \"@/pages/MentorSessions\";|import MentorMentees from \"@/pages/MentorMentees\";|; s|<MentorSessions />|<MentorMentees />|' __harness/main.tsx)",
+      "Bash(node __harness/shot.mjs)",
+      "Bash(cp src/pages/AdminPrograms.tsx __harness/AdminPrograms.bak)",
+      "Bash(perl -0pi -e 's/id=\"program-capacity\"\\\\n                      inputMode=\"numeric\"\\\\n                      placeholder=\"e\\\\.g\\\\. 25\"/id=\"program-capacity\"\\\\n                      type=\"number\"\\\\n                      min={1}/' src/pages/AdminPrograms.tsx)",
+      "Bash(node __harness/paste.mjs)",
+      "Bash(cp __harness/AdminPrograms.bak src/pages/AdminPrograms.tsx)",
+      "Bash(npm run *)"
+    ],
+    "additionalDirectories": [
+      "C:\\Programming\\BeezTech\\Mentorle\\Mentorle-Version2"
     ]
   }
 }

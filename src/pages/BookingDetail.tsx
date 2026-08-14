@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { useStickyActionBar } from "@/contexts/StickyActionBarContext";
 import { useBookingDetail } from "@/features/mentor-bookings/useBookingDetail";
 import {
   useUpdateSessionStatus,
@@ -100,6 +101,7 @@ const BookingDetail = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const registerActionBar = useStickyActionBar();
 
   const { data: booking, isLoading, error } = useBookingDetail(sessionIdToLoad);
   const updateStatus = useUpdateSessionStatus(user?.id);
@@ -502,7 +504,7 @@ const BookingDetail = () => {
       </div>
 
       {/* Sticky bottom bar */}
-      <div className="sticky bottom-0 z-20 border-t bg-background/95 backdrop-blur shadow-lg -mx-3 -mb-3 sm:-mx-4 sm:-mb-4 md:-mx-6 md:-mb-6 px-3 sm:px-4 md:px-6 py-3 mt-6">
+      <div ref={registerActionBar} className="sticky bottom-0 z-20 border-t bg-background/95 backdrop-blur shadow-lg -mx-3 -mb-3 sm:-mx-4 sm:-mb-4 md:-mx-6 md:-mb-6 px-3 sm:px-4 md:px-6 py-3 mt-6">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           {/* Save details */}
           <Button

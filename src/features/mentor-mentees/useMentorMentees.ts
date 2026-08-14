@@ -18,7 +18,8 @@ export interface ProgramLite {
 
 export interface MentorMenteeRow {
   key: string;
-  program: ProgramLite;
+  /** null when the mentee reached this mentor by booking a session, outside any shared program. */
+  program: ProgramLite | null;
   mentee: MenteeRow;
   assigned: boolean;
 }
@@ -31,44 +32,54 @@ export function useMentorMentees(userId?: string) {
     enabled: !!userId,
     staleTime: 60_000,
     queryFn: async (): Promise<MentorMenteeRow[]> => {
-      // 1) Programs the mentor belongs to
-      const { data: mp } = await supabase
-        .from("program_mentors")
-        .select("program_id")
-        .eq("mentor_id", userId!);
+      // 1) Programs the mentor belongs to, and mentees who booked a session with them.
+      const [mpRes, bookingRes] = await Promise.all([
+        supabase.from("program_mentors").select("program_id").eq("mentor_id", userId!),
+        supabase
+          .from("sessions")
+          .select("mentee_id")
+          .eq("mentor_id", userId!)
+          .neq("status", "cancelled"),
+      ]);
+
       const programIds = Array.from(
-        new Set((mp ?? []).map((r) => r.program_id).filter(Boolean) as string[])
+        new Set((mpRes.data ?? []).map((r) => r.program_id).filter(Boolean) as string[])
       );
-      if (programIds.length === 0) return [];
+      const bookedMenteeIds = Array.from(
+        new Set((bookingRes.data ?? []).map((s) => s.mentee_id).filter(Boolean) as string[])
+      );
 
       // 2/3/4 — parallel
       const [progsRes, enrollRes, assignRes] = await Promise.all([
-        supabase
-          .from("programs")
-          .select("id,name,status,slug,color")
-          .in("id", programIds),
-        supabase
-          .from("program_mentees")
-          .select("program_id, mentee_id")
-          .in("program_id", programIds),
+        programIds.length
+          ? supabase.from("programs").select("id,name,status,slug,color").in("id", programIds)
+          : Promise.resolve({ data: [] as unknown[] }),
+        programIds.length
+          ? supabase.from("program_mentees").select("program_id, mentee_id").in("program_id", programIds)
+          : Promise.resolve({ data: [] as unknown[] }),
         supabase
           .from("mentor_mentee_assignments")
           .select("program_id, mentee_id")
           .eq("mentor_id", userId!),
       ]);
 
+      const enrollments = (enrollRes.data ?? []) as { program_id: string; mentee_id: string }[];
+
       const progById: Record<string, ProgramLite> = {};
       (progsRes.data ?? []).forEach((p) => {
-        progById[p.id as string] = p as unknown as ProgramLite;
+        progById[(p as ProgramLite).id] = p as ProgramLite;
       });
 
       const assignedSet = new Set(
         (assignRes.data ?? []).map((a) => `${a.program_id}:${a.mentee_id}`)
       );
 
-      // 5) Mentee user records
+      // 5) Mentee user records — program enrolments plus direct bookings
       const menteeIds = Array.from(
-        new Set((enrollRes.data ?? []).map((e) => e.mentee_id).filter(Boolean) as string[])
+        new Set([
+          ...enrollments.map((e) => e.mentee_id).filter(Boolean),
+          ...bookedMenteeIds,
+        ])
       );
       const userById: Record<string, MenteeRow> = {};
       if (menteeIds.length > 0) {
@@ -80,10 +91,10 @@ export function useMentorMentees(userId?: string) {
         (us ?? []).forEach((u) => (userById[u.id as string] = u as MenteeRow));
       }
 
-      return (enrollRes.data ?? [])
+      const programRows = enrollments
         .map((e) => {
-          const program = progById[e.program_id as string];
-          const mentee = userById[e.mentee_id as string];
+          const program = progById[e.program_id];
+          const mentee = userById[e.mentee_id];
           if (!program || !mentee) return null;
           return {
             key: `${e.program_id}:${e.mentee_id}`,
@@ -93,6 +104,18 @@ export function useMentorMentees(userId?: string) {
           } as MentorMenteeRow;
         })
         .filter(Boolean) as MentorMenteeRow[];
+
+      const inProgram = new Set(programRows.map((r) => r.mentee.id));
+      const directRows = bookedMenteeIds
+        .filter((id) => !inProgram.has(id) && userById[id])
+        .map<MentorMenteeRow>((id) => ({
+          key: `direct:${id}`,
+          program: null,
+          mentee: userById[id],
+          assigned: false,
+        }));
+
+      return [...programRows, ...directRows];
     },
   });
 }
@@ -101,6 +124,7 @@ export function useMentorMentees(userId?: string) {
 export function selectMenteeProgramMap(rows: MentorMenteeRow[]) {
   const map: Record<string, { name: string; color: string; slug: string }[]> = {};
   for (const r of rows) {
+    if (!r.program) continue;
     (map[r.mentee.id] ||= []).push({
       name: r.program.name,
       color: r.program.color,

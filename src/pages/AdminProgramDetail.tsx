@@ -33,6 +33,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, X, GripVertical, Tag, Check, CheckCircle2, Circle, UserPlus, Search, Info, MoreHorizontal, Pencil, Archive, Trash2 } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
+import { cn } from "@/lib/utils";
+import { validateProgramForm, hasProgramFormErrors } from "@/features/programs/validation";
 
 type Program = Database["public"]["Tables"]["programs"]["Row"];
 type UserRow = { id: string; full_name: string; email: string };
@@ -214,6 +216,14 @@ const AdminProgramDetail = () => {
     ends_on: "",
     capacity: "",
   });
+  const [attemptedSave, setAttemptedSave] = useState(false);
+
+  const editErrors = attemptedSave ? validateProgramForm(editForm) : {};
+
+  const closeEdit = () => {
+    setEditOpen(false);
+    setAttemptedSave(false);
+  };
 
 
   const programId = program?.id;
@@ -441,7 +451,16 @@ const AdminProgramDetail = () => {
 
   const saveProgram = async () => {
     if (!program) return;
-    if (!editForm.name.trim()) return;
+    setAttemptedSave(true);
+    const validation = validateProgramForm(editForm);
+    if (hasProgramFormErrors(validation)) {
+      toast({
+        variant: "destructive",
+        title: "Check the form",
+        description: Object.values(validation)[0],
+      });
+      return;
+    }
     setSavingProgram(true);
     const { error } = await supabase
       .from("programs")
@@ -461,6 +480,7 @@ const AdminProgramDetail = () => {
     }
     toast({ title: "Program updated" });
     setEditOpen(false);
+    setAttemptedSave(false);
     load();
   };
 
@@ -761,13 +781,20 @@ const AdminProgramDetail = () => {
       </div>
 
       {/* Edit program dialog */}
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      <Dialog open={editOpen} onOpenChange={(next) => (next ? setEditOpen(true) : closeEdit())}>
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
           <DialogHeader><DialogTitle>Edit program</DialogTitle></DialogHeader>
           <div className="space-y-3 pt-2">
             <div className="space-y-1.5">
-              <Label>Name</Label>
-              <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+              <Label htmlFor="edit-program-name">Name <span className="text-destructive">*</span></Label>
+              <Input
+                id="edit-program-name"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                aria-invalid={!!editErrors.name}
+                className={cn(editErrors.name && "border-destructive focus-visible:ring-destructive")}
+              />
+              {editErrors.name && <p className="text-xs text-destructive">{editErrors.name}</p>}
             </div>
             <div className="space-y-1.5">
               <Label>Description</Label>
@@ -775,18 +802,41 @@ const AdminProgramDetail = () => {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Starts on</Label>
-                <Input type="date" value={editForm.starts_on} onChange={(e) => setEditForm({ ...editForm, starts_on: e.target.value })} />
+                <Label htmlFor="edit-program-starts-on">Starts on</Label>
+                <Input
+                  id="edit-program-starts-on"
+                  type="date"
+                  value={editForm.starts_on}
+                  onChange={(e) => setEditForm({ ...editForm, starts_on: e.target.value })}
+                />
               </div>
               <div className="space-y-1.5">
-                <Label>Ends on</Label>
-                <Input type="date" value={editForm.ends_on} onChange={(e) => setEditForm({ ...editForm, ends_on: e.target.value })} />
+                <Label htmlFor="edit-program-ends-on">Ends on</Label>
+                <Input
+                  id="edit-program-ends-on"
+                  type="date"
+                  min={editForm.starts_on || undefined}
+                  value={editForm.ends_on}
+                  onChange={(e) => setEditForm({ ...editForm, ends_on: e.target.value })}
+                  aria-invalid={!!editErrors.ends_on}
+                  className={cn(editErrors.ends_on && "border-destructive focus-visible:ring-destructive")}
+                />
+                {editErrors.ends_on && <p className="text-xs text-destructive">{editErrors.ends_on}</p>}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Capacity</Label>
-                <Input type="number" min={0} value={editForm.capacity} onChange={(e) => setEditForm({ ...editForm, capacity: e.target.value })} />
+                <Label htmlFor="edit-program-capacity">Capacity</Label>
+                <Input
+                  id="edit-program-capacity"
+                  inputMode="numeric"
+                  placeholder="e.g. 25"
+                  value={editForm.capacity}
+                  onChange={(e) => setEditForm({ ...editForm, capacity: e.target.value })}
+                  aria-invalid={!!editErrors.capacity}
+                  className={cn(editErrors.capacity && "border-destructive focus-visible:ring-destructive")}
+                />
+                {editErrors.capacity && <p className="text-xs text-destructive">{editErrors.capacity}</p>}
               </div>
               <div className="space-y-1.5">
                 <Label>Status</Label>
@@ -802,8 +852,8 @@ const AdminProgramDetail = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-            <Button onClick={saveProgram} disabled={savingProgram || !editForm.name.trim()}>Save changes</Button>
+            <Button variant="outline" onClick={closeEdit}>Cancel</Button>
+            <Button onClick={saveProgram} disabled={savingProgram}>Save changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

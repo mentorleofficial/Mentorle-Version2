@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { PhoneInput } from "@/components/ui/phone-input";
 import ResumeUploadCard from "@/components/profile/ResumeUploadCard";
 import { useBranding } from "@/contexts/BrandingContext";
+import { useStickyActionBar } from "@/contexts/StickyActionBarContext";
 
 // ─── Moved outside component so they don't remount on each render ───
 
@@ -100,11 +101,13 @@ const MenteeProfile = () => {
   const { toast } = useToast();
   const invalidate = useInvalidateMenteeProfile();
   const { data, isLoading } = useMenteeProfile(user?.id);
+  const registerSaveBar = useStickyActionBar();
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadingResume, setUploadingResume] = useState(false);
+  const [nameTouched, setNameTouched] = useState(false);
 
   // Original fields
   const [fullName, setFullName] = useState("");
@@ -262,6 +265,9 @@ const MenteeProfile = () => {
 
   const firstName = fullName.trim().split(" ")[0] ?? "";
 
+  const nameMissing = !fullName.trim();
+  const showNameError = nameTouched && nameMissing;
+
   const addProtocol = (url: string) => {
     if (!url) return "";
     let clean = url.trim().replace(/\/+$/, "");
@@ -328,6 +334,17 @@ const MenteeProfile = () => {
 
   const handleSave = async () => {
     if (!user || !hasChanges) return;
+
+    if (nameMissing) {
+      setNameTouched(true);
+      toast({
+        variant: "destructive",
+        title: "Name is required",
+        description: "Enter your full name before saving.",
+      });
+      return;
+    }
+
     const cleanLinkedin = addProtocol(linkedin);
     const cleanGithub = addProtocol(github);
     const cleanPortfolio = addProtocol(portfolio);
@@ -479,13 +496,26 @@ const MenteeProfile = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div className="space-y-1.5">
-                  <FieldLabel htmlFor="fullName">Full name</FieldLabel>
+                  <FieldLabel htmlFor="fullName">
+                    Full name <span className="text-destructive">*</span>
+                  </FieldLabel>
                   <Input
                     id="fullName"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
+                    onBlur={() => setNameTouched(true)}
                     placeholder="Alex Rivera"
+                    aria-invalid={showNameError}
+                    aria-describedby={showNameError ? "fullName-error" : undefined}
+                    className={cn(
+                      showNameError && "border-destructive focus-visible:ring-destructive"
+                    )}
                   />
+                  {showNameError && (
+                    <p id="fullName-error" className="text-xs text-destructive">
+                      Name is required
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <FieldLabel htmlFor="orgUnit">Team / department</FieldLabel>
@@ -1120,7 +1150,7 @@ const MenteeProfile = () => {
       </div>
 
       {/* Sticky save bar */}
-      <div className="sticky bottom-0 z-20 border-t bg-background/95 backdrop-blur shadow-lg -mx-3 -mb-3 sm:-mx-4 sm:-mb-4 md:-mx-6 md:-mb-6 px-3 sm:px-4 md:px-6 py-3 mt-6">
+      <div ref={registerSaveBar} className="sticky bottom-0 z-20 border-t bg-background/95 backdrop-blur shadow-lg -mx-3 -mb-3 sm:-mx-4 sm:-mb-4 md:-mx-6 md:-mb-6 px-3 sm:px-4 md:px-6 py-3 mt-6">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground flex items-center gap-2">
             {hasChanges ? (

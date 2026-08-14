@@ -52,6 +52,7 @@ import { getResumeSignedUrl } from "@/features/mentor-profile/api/mentorProfile"
 import AvatarUploader from "@/features/mentor-profile/components/AvatarUploader";
 import { calculateCompleteness } from "@/features/mentor-profile/utils/completeness";
 import ProfileCompletionChecklist from "@/features/mentor-profile/components/ProfileCompletionChecklist";
+import { useStickyActionBar } from "@/contexts/StickyActionBarContext";
 
 const SECTIONS = [
   { id: "about", label: "About", icon: User },
@@ -76,6 +77,7 @@ const MentorProfile = () => {
   const userId = user?.id;
   const { data, isLoading } = useMentorProfile(userId);
   const update = useUpdateMentorProfile(userId ?? "");
+  const registerSaveBar = useStickyActionBar();
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
@@ -713,7 +715,7 @@ const MentorProfile = () => {
 
         {/* Sticky save bar */}
         {dirty && (
-          <div className="sticky bottom-0 z-20 border-t bg-background/95 backdrop-blur shadow-lg -mx-3 -mb-3 sm:-mx-4 sm:-mb-4 md:-mx-6 md:-mb-6 px-3 sm:px-4 md:px-6 py-3 mt-6">
+          <div ref={registerSaveBar} className="sticky bottom-0 z-20 border-t bg-background/95 backdrop-blur shadow-lg -mx-3 -mb-3 sm:-mx-4 sm:-mb-4 md:-mx-6 md:-mb-6 px-3 sm:px-4 md:px-6 py-3 mt-6">
             <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
               <p className="text-sm text-muted-foreground flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />

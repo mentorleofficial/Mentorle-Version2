@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Search, ArrowRight, Calendar, Users } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
+import { cn } from "@/lib/utils";
+import { validateProgramForm, hasProgramFormErrors } from "@/features/programs/validation";
 
 type Program = Database["public"]["Tables"]["programs"]["Row"];
 
@@ -33,6 +35,14 @@ const AdminPrograms = () => {
     starts_on: "", ends_on: "", capacity: "",
   });
   const [saving, setSaving] = useState(false);
+  const [attemptedCreate, setAttemptedCreate] = useState(false);
+
+  const errors = attemptedCreate ? validateProgramForm(form) : {};
+
+  const closeDialog = () => {
+    setOpen(false);
+    setAttemptedCreate(false);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -61,7 +71,16 @@ const AdminPrograms = () => {
   }, [programs, query]);
 
   const create = async () => {
-    if (!form.name.trim()) return;
+    setAttemptedCreate(true);
+    const validation = validateProgramForm(form);
+    if (hasProgramFormErrors(validation)) {
+      toast({
+        variant: "destructive",
+        title: "Check the form",
+        description: Object.values(validation)[0],
+      });
+      return;
+    }
     setSaving(true);
     const slug = slugify(form.name) + "-" + Math.random().toString(36).slice(2, 6);
     const { error } = await supabase.from("programs").insert({
@@ -82,6 +101,7 @@ const AdminPrograms = () => {
     toast({ title: "Program created" });
     setOpen(false);
     setForm({ name: "", description: "", status: "draft", starts_on: "", ends_on: "", capacity: "" });
+    setAttemptedCreate(false);
     load();
   };
 
@@ -95,7 +115,7 @@ const AdminPrograms = () => {
             <h1 className="text-2xl font-bold">Programs</h1>
             <p className="text-muted-foreground mt-1">Cohorts and tracks. Map mentors to mentees inside each program.</p>
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : closeDialog())}>
             <DialogTrigger asChild>
               <Button><Plus className="h-4 w-4 mr-2" />New program</Button>
             </DialogTrigger>
@@ -103,8 +123,16 @@ const AdminPrograms = () => {
               <DialogHeader><DialogTitle>Create program</DialogTitle></DialogHeader>
               <div className="space-y-3 pt-2">
                 <div className="space-y-1.5">
-                  <Label>Name</Label>
-                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Spring 2026 Engineering Cohort" />
+                  <Label htmlFor="program-name">Name <span className="text-destructive">*</span></Label>
+                  <Input
+                    id="program-name"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    placeholder="e.g. Spring 2026 Engineering Cohort"
+                    aria-invalid={!!errors.name}
+                    className={cn(errors.name && "border-destructive focus-visible:ring-destructive")}
+                  />
+                  {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Description</Label>
@@ -112,18 +140,41 @@ const AdminPrograms = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label>Starts on</Label>
-                    <Input type="date" value={form.starts_on} onChange={(e) => setForm({ ...form, starts_on: e.target.value })} />
+                    <Label htmlFor="program-starts-on">Starts on</Label>
+                    <Input
+                      id="program-starts-on"
+                      type="date"
+                      value={form.starts_on}
+                      onChange={(e) => setForm({ ...form, starts_on: e.target.value })}
+                    />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Ends on</Label>
-                    <Input type="date" value={form.ends_on} onChange={(e) => setForm({ ...form, ends_on: e.target.value })} />
+                    <Label htmlFor="program-ends-on">Ends on</Label>
+                    <Input
+                      id="program-ends-on"
+                      type="date"
+                      min={form.starts_on || undefined}
+                      value={form.ends_on}
+                      onChange={(e) => setForm({ ...form, ends_on: e.target.value })}
+                      aria-invalid={!!errors.ends_on}
+                      className={cn(errors.ends_on && "border-destructive focus-visible:ring-destructive")}
+                    />
+                    {errors.ends_on && <p className="text-xs text-destructive">{errors.ends_on}</p>}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label>Capacity</Label>
-                    <Input type="number" min={0} value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} />
+                    <Label htmlFor="program-capacity">Capacity</Label>
+                    <Input
+                      id="program-capacity"
+                      inputMode="numeric"
+                      placeholder="e.g. 25"
+                      value={form.capacity}
+                      onChange={(e) => setForm({ ...form, capacity: e.target.value })}
+                      aria-invalid={!!errors.capacity}
+                      className={cn(errors.capacity && "border-destructive focus-visible:ring-destructive")}
+                    />
+                    {errors.capacity && <p className="text-xs text-destructive">{errors.capacity}</p>}
                   </div>
                   <div className="space-y-1.5">
                     <Label>Status</Label>
@@ -139,8 +190,8 @@ const AdminPrograms = () => {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                <Button onClick={create} disabled={saving || !form.name.trim()}>Create</Button>
+                <Button variant="outline" onClick={closeDialog}>Cancel</Button>
+                <Button onClick={create} disabled={saving}>Create</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

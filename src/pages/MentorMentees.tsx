@@ -16,6 +16,8 @@ import { Search, Users } from "lucide-react";
 const initials = (name: string) =>
   name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
 
+const DIRECT_GROUP = "__direct__";
+
 const MentorMentees = () => {
   const { user } = useAuth();
   const [params, setParams] = useSearchParams();
@@ -33,7 +35,7 @@ const MentorMentees = () => {
 
     // Program filter
     if (programFilter !== "all") {
-      result = result.filter((r) => r.program.slug === programFilter);
+      result = result.filter((r) => r.program?.slug === programFilter);
     }
 
     // Search filter
@@ -50,7 +52,7 @@ const MentorMentees = () => {
 
   const byProgram = useMemo(() => {
     return filteredRows.reduce<Record<string, MentorMenteeRow[]>>((acc, r) => {
-      (acc[r.program.id] ||= []).push(r);
+      (acc[r.program?.id ?? DIRECT_GROUP] ||= []).push(r);
       return acc;
     }, {});
   }, [filteredRows]);
@@ -139,7 +141,7 @@ const MentorMentees = () => {
                   ? "No matches for your search."
                   : programFilter !== "all"
                     ? "No mentees enrolled in this program yet."
-                    : "You don't have any mentees enrolled yet."}
+                    : "You don't have any mentees yet. They'll appear here once a mentee books a session with you or joins one of your programs."}
               </p>
             </CardContent>
           </Card>
@@ -148,18 +150,23 @@ const MentorMentees = () => {
             {Object.values(byProgram).map((group) => {
               const program = group[0].program;
               return (
-                <Card key={program.id} className="overflow-hidden">
+                <Card key={program?.id ?? DIRECT_GROUP} className="overflow-hidden">
                   <CardHeader className="pb-4 border-b">
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle className="text-xl">{program.name}</CardTitle>
+                        <CardTitle className="text-xl">
+                          {program ? program.name : "Direct bookings"}
+                        </CardTitle>
                         <p className="text-sm text-muted-foreground mt-1">
                           {group.length} mentee{group.length !== 1 ? "s" : ""}
+                          {!program && " who booked a session with you"}
                         </p>
                       </div>
-                      <Badge variant="secondary" className="capitalize">
-                        {program.status}
-                      </Badge>
+                      {program && (
+                        <Badge variant="secondary" className="capitalize">
+                          {program.status}
+                        </Badge>
+                      )}
                     </div>
                   </CardHeader>
 
