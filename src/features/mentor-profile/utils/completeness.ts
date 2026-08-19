@@ -61,7 +61,7 @@ export function calculateCompleteness(data: CompletenessData): {
     { key: "expertise", label: "At least 1 Expertise tag", check: Array.isArray(data.expertise) && data.expertise.length > 0 },
     { key: "qualifications", label: "At least 1 Education qualification", check: Array.isArray(data.qualifications) && data.qualifications.length > 0 },
     { key: "experiences", label: "At least 1 Work Experience entry", check: Array.isArray(data.experiences) && data.experiences.length > 0 },
-    { key: "resume_url", label: "Resume Upload", check: !!data.resume_url && data.resume_url.trim().length > 0 },
+    { key: "resume_url", label: "Resume Upload", check: !!data.resume_url && data.resume_url.trim().length > 0, optional: true },
     { key: "avatar_url", label: "Profile Photo", check: !!data.avatar_url && data.avatar_url.trim().length > 0 },
     { key: "has_offerings", label: "At least 1 Active Offering", check: !!data.has_offerings },
   ];

@@ -17,10 +17,10 @@ const ProfileCompletionChecklist = ({ profileData }: Props) => {
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
           <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-          Required for 100% Completion
+          Recommended before going live
         </CardTitle>
         <CardDescription>
-          Complete these steps to unlock availability setting, program joining, booking slots, and active features.
+          Finish these items so your public profile looks complete when an admin activates your account.
         </CardDescription>
       </CardHeader>
       <CardContent>

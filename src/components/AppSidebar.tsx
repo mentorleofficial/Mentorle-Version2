@@ -21,7 +21,6 @@ import {
   ShieldCheck,
   Trophy,
   ExternalLink,
-  Lock,
   Tag,
   CalendarDays,
   CalendarPlus,
@@ -31,8 +30,6 @@ import {
   Wallet,
   Coins,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
 import {
   Sidebar,
   SidebarContent,
@@ -51,8 +48,7 @@ import { useOpenActionItemsCount } from "@/features/action-items/useActionItems"
 import { usePlusQuota } from "@/features/plus/usePlus";
 
 const AppSidebar = () => {
-  const { profile, signOut, mentorActive, isApproved, profileCompleteness } = useAuth();
-  const { toast } = useToast();
+  const { profile, signOut, isApproved } = useAuth();
   const branding = useBranding();
   const navigate = useNavigate();
   const location = useLocation();
@@ -87,7 +83,7 @@ const AppSidebar = () => {
     { title: "Audit Logs", icon: ClipboardList, path: "/admin/audit-logs" },
   ];
 
-  const mentorItemsActive = [
+  const mentorItems = [
     { title: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     { title: "My Profile", icon: User, path: "/mentor/profile" },
     { title: "Offerings", icon: Tag, path: "/mentor/offerings" },
@@ -104,11 +100,6 @@ const AppSidebar = () => {
     ...(branding.mentor_community_url
       ? [{ title: "Mentor Community", icon: ExternalLink, path: "__community__", href: branding.mentor_community_url }]
       : []),
-  ];
-  const mentorItemsInactive = [
-    { title: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
-    { title: "My Profile", icon: User, path: "/mentor/profile" },
-    { title: "Offerings", icon: Tag, path: "/mentor/offerings" },
   ];
 
   const { data: openTasksCount = 0 } = useOpenActionItemsCount(profile?.id, "mentee");
@@ -133,24 +124,11 @@ const AppSidebar = () => {
     { title: "Privacy & My Data", icon: Shield, path: "/account/privacy" },
   ];
 
-  const isProfileLocked = role === "mentor" && isApproved && profileCompleteness < 100;
-
-  const getMentorItems = () => {
-    if (!isApproved) return mentorItemsInactive;
-    return mentorItemsActive.map((item) => {
-      const isLocked = isProfileLocked && !["/dashboard", "/mentor/profile", "/mentor/offerings"].includes(item.path);
-      return {
-        ...item,
-        isLocked,
-      };
-    });
-  };
-
   const items =
     role === "admin"
       ? adminItems
       : role === "mentor"
-        ? getMentorItems()
+        ? mentorItems
         : menteeItems;
   const initials = profile?.full_name?.split(" ").map((n) => n[0]).join("").toUpperCase() || "?";
 
@@ -183,36 +161,17 @@ const AppSidebar = () => {
                     <SidebarMenuButton
                       isActive={location.pathname === item.path}
                       tooltip={
-                        item.isLocked
-                          ? `${item.title} (Locked - Complete Profile)`
-                          : item.badge
-                            ? `${item.title} (${item.badge})`
-                            : item.title
+                        item.badge ? `${item.title} (${item.badge})` : item.title
                       }
                       onClick={() => {
-                        if (item.isLocked) {
-                          toast({
-                            variant: "destructive",
-                            title: "Features Locked",
-                            description: "Please complete your profile to 100% to unlock availability, programs, and bookings.",
-                          });
-                          return;
-                        }
                         if (item.href) window.open(item.href, "_blank", "noopener,noreferrer");
                         else navigate(item.path);
                       }}
-                      className={cn(
-                        "gap-3 transition-all duration-200",
-                        item.isLocked &&
-                        "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-sidebar-foreground"
-                      )}
+                      className="gap-3 transition-all duration-200"
                     >
                       <Icon className="h-4 w-4 shrink-0" />
                       <span className="flex-1 truncate">{item.title}</span>
-                      {item.isLocked && (
-                        <Lock className="h-3 w-3 text-muted-foreground/60 shrink-0 ml-auto" />
-                      )}
-                      {item.badge && !item.isLocked ? (
+                      {item.badge ? (
                         <Badge
                           variant="secondary"
                           className="h-5 min-w-5 px-1.5 text-xs group-data-[collapsible=icon]:hidden"
@@ -220,7 +179,7 @@ const AppSidebar = () => {
                           {item.badge}
                         </Badge>
                       ) : null}
-                      {item.badge && !item.isLocked ? (
+                      {item.badge ? (
                         <span
                           aria-hidden
                           className="hidden group-data-[collapsible=icon]:block absolute top-1 right-1 h-2 w-2 rounded-full bg-sidebar-primary ring-2 ring-sidebar"
@@ -246,7 +205,7 @@ const AppSidebar = () => {
           <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
             <p className="text-sm font-medium text-sidebar-foreground truncate">{profile?.full_name}</p>
             <p className="text-xs text-sidebar-foreground/60 capitalize">
-              {profile?.role}{role === "mentor" && !mentorActive ? " · inactive" : ""}
+              {profile?.role}{role === "mentor" && !isApproved ? " · not live" : ""}
             </p>
           </div>
           <button

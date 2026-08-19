@@ -378,7 +378,7 @@ const AdminUsers = () => {
       </div>
 
       <Dialog open={!!detailsUser} onOpenChange={(o) => { if (!o) setDetailsUser(null); }}>
-        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-xl md:max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-xl md:max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>User Details</DialogTitle>
           </DialogHeader>
@@ -758,98 +758,120 @@ const UserDetailsDialogContent = ({ userId, role }: { userId: string; role: AppR
         </div>
       )}
 
-      {role === "mentor" && profile && (
-        <div className="space-y-4 pt-2 border-t">
-          <h4 className="font-semibold text-sm uppercase tracking-wider text-slate-500">Mentor Profile</h4>
+      {role === "mentor" && !profile && (
+        <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground">
+          No mentor profile created yet.
+        </div>
+      )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            {profile.headline && (
-              <div className="md:col-span-2">
-                <span className="text-xs uppercase tracking-wide text-muted-foreground block">Headline</span>
-                <span>{profile.headline}</span>
-              </div>
-            )}
-            {profile.bio && (
-              <div className="md:col-span-2">
-                <span className="text-xs uppercase tracking-wide text-muted-foreground block">Bio</span>
-                <p className="whitespace-pre-wrap">{profile.bio}</p>
-              </div>
-            )}
-            {profile.current_organization && (
-              <div>
-                <span className="text-xs uppercase tracking-wide text-muted-foreground block">Organization</span>
-                <span>{profile.current_organization}</span>
-              </div>
-            )}
-            {profile.current_role && (
-              <div>
-                <span className="text-xs uppercase tracking-wide text-muted-foreground block">Role</span>
-                <span>{profile.current_role}</span>
-              </div>
-            )}
-            {profile.years_experience !== null && profile.years_experience !== undefined && (
-              <div>
-                <span className="text-xs uppercase tracking-wide text-muted-foreground block">Years of Experience</span>
-                <span>{profile.years_experience} {profile.years_experience === 1 ? 'year' : 'years'}</span>
-              </div>
-            )}
-            {profile.timezone && (
-              <div>
-                <span className="text-xs uppercase tracking-wide text-muted-foreground block">Timezone</span>
-                <span>{profile.timezone}</span>
-              </div>
-            )}
-            {profile.professional_status && (
-              <div>
-                <span className="text-xs uppercase tracking-wide text-muted-foreground block">Professional Status</span>
-                <span>{profile.professional_status}</span>
-              </div>
-            )}
-            {profile.phone && (
-              <div>
-                <span className="text-xs uppercase tracking-wide text-muted-foreground block">Phone</span>
-                <span>{profile.phone}</span>
-              </div>
-            )}
-            {profile.linkedin_url && (
-              <div>
-                <span className="text-xs uppercase tracking-wide text-muted-foreground block">LinkedIn</span>
-                <a href={profile.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
-                  {profile.linkedin_url}
-                </a>
-              </div>
-            )}
-            {profile.portfolio_url && (
-              <div>
-                <span className="text-xs uppercase tracking-wide text-muted-foreground block">Portfolio / Website</span>
-                <a href={profile.portfolio_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
-                  {profile.portfolio_url}
-                </a>
-              </div>
-            )}
-            {profile.resume_url && (
-              <div>
-                <span className="text-xs uppercase tracking-wide text-muted-foreground block mb-1">Resume</span>
-                {resumeUrl ? (
-                  <a href={resumeUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
-                    View Resume
-                  </a>
-                ) : (
-                  <span className="text-muted-foreground text-xs flex items-center gap-1.5">
-                    {isLoadingResume ? (
-                      <>
-                        <Loader2 className="h-3 w-3 animate-spin" /> Loading...
-                      </>
-                    ) : (
-                      "No resume available"
-                    )}
-                  </span>
+      {role === "mentor" && profile && (() => {
+        const fmtMonthYear = (d: string) => {
+          if (!d) return null;
+          const [y, m] = d.split("-").map(Number);
+          if (!y) return d;
+          return new Date(y, (m || 1) - 1, 1).toLocaleDateString(undefined, { month: "short", year: "numeric" });
+        };
+        const experiences = Array.isArray(profile.experiences) ? profile.experiences : [];
+        const qualifications = Array.isArray(profile.qualifications) ? profile.qualifications : [];
+        const phoneTel = profile.phone?.replace(/\s/g, "") ?? "";
+
+        return (
+          <div className="space-y-5 pt-2 border-t">
+            <h4 className="font-semibold text-sm uppercase tracking-wider text-slate-500">Mentor Profile</h4>
+
+            {/* Contact & Status */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b pb-1">Contact & Status</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-xs text-muted-foreground block">Email</span>
+                  <a href={`mailto:${email}`} className="text-primary hover:underline break-all">{email}</a>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground block">Phone</span>
+                  {profile.phone ? (
+                    <a href={`tel:${phoneTel}`} className="text-primary hover:underline">{profile.phone}</a>
+                  ) : (
+                    <span>—</span>
+                  )}
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground block">Timezone</span>
+                  <span>{profile.timezone || "—"}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground block">Public Status</span>
+                  {profile.is_active ? (
+                    <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400">Live</Badge>
+                  ) : (
+                    <Badge variant="outline">Not live</Badge>
+                  )}
+                </div>
+                {profile.slug && (
+                  <div className="md:col-span-2">
+                    <span className="text-xs text-muted-foreground block">Public Profile</span>
+                    <a
+                      href={`/mentors/${profile.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline break-all"
+                    >
+                      /mentors/{profile.slug}
+                    </a>
+                  </div>
                 )}
               </div>
+            </div>
+
+            {/* About & Professional */}
+            {(profile.headline || profile.bio || profile.professional_status || profile.current_organization || profile.current_role || profile.years_experience != null) && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b pb-1">About & Professional</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  {profile.headline && (
+                    <div className="md:col-span-2">
+                      <span className="text-xs text-muted-foreground block">Headline</span>
+                      <span>{profile.headline}</span>
+                    </div>
+                  )}
+                  {profile.bio && (
+                    <div className="md:col-span-2">
+                      <span className="text-xs text-muted-foreground block">Bio</span>
+                      <p className="whitespace-pre-wrap">{profile.bio}</p>
+                    </div>
+                  )}
+                  {profile.professional_status && (
+                    <div>
+                      <span className="text-xs text-muted-foreground block">Professional Status</span>
+                      <span>{profile.professional_status}</span>
+                    </div>
+                  )}
+                  {profile.current_organization && (
+                    <div>
+                      <span className="text-xs text-muted-foreground block">Organization</span>
+                      <span>{profile.current_organization}</span>
+                    </div>
+                  )}
+                  {profile.current_role && (
+                    <div>
+                      <span className="text-xs text-muted-foreground block">Role</span>
+                      <span>{profile.current_role}</span>
+                    </div>
+                  )}
+                  {profile.years_experience !== null && profile.years_experience !== undefined && (
+                    <div>
+                      <span className="text-xs text-muted-foreground block">Years of Experience</span>
+                      <span>{profile.years_experience} {profile.years_experience === 1 ? "year" : "years"}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
+
+            {/* Expertise */}
             {profile.expertise && profile.expertise.length > 0 && (
-              <div className="md:col-span-2">
-                <span className="text-xs uppercase tracking-wide text-muted-foreground block mb-1">Expertise</span>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b pb-1">Expertise</p>
                 <div className="flex flex-wrap gap-1">
                   {profile.expertise.map((exp: string) => (
                     <Badge key={exp} variant="secondary">{exp}</Badge>
@@ -857,9 +879,128 @@ const UserDetailsDialogContent = ({ userId, role }: { userId: string; role: AppR
                 </div>
               </div>
             )}
+
+            {/* Work Experience */}
+            {experiences.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b pb-1">Work Experience</p>
+                <div className="space-y-2">
+                  {experiences.map((exp: any, i: number) => (
+                    <div key={i} className="rounded-lg border bg-muted/30 p-3 text-sm space-y-0.5">
+                      <p className="font-medium">
+                        {exp.title || "—"}
+                        {exp.company ? ` @ ${exp.company}` : ""}
+                      </p>
+                      {(exp.start_date || exp.end_date) && (
+                        <p className="text-xs text-muted-foreground">
+                          {fmtMonthYear(exp.start_date) || "—"} → {exp.end_date ? fmtMonthYear(exp.end_date) : "Present"}
+                        </p>
+                      )}
+                      {exp.location && <p className="text-xs text-muted-foreground">{exp.location}</p>}
+                      {exp.description && <p className="text-xs text-muted-foreground mt-1">{exp.description}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Qualifications */}
+            {qualifications.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b pb-1">Qualifications</p>
+                <div className="space-y-2">
+                  {qualifications.map((q: any, i: number) => (
+                    <div key={i} className="rounded-lg border bg-muted/30 p-3 text-sm space-y-0.5">
+                      <p className="font-medium">
+                        {q.degree || "—"}
+                        {q.field ? ` in ${q.field}` : ""}
+                      </p>
+                      {q.institution && <p className="text-xs text-muted-foreground">{q.institution}</p>}
+                      {(q.start_year || q.end_year) && (
+                        <p className="text-xs text-muted-foreground">
+                          {q.start_year || "—"}
+                          {" → "}
+                          {q.end_year === "present" ? "Present" : (q.end_year || "—")}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Links & Resume */}
+            {(profile.linkedin_url || profile.portfolio_url || profile.resume_url) && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b pb-1">Links & Resume</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  {profile.linkedin_url && (
+                    <div>
+                      <span className="text-xs text-muted-foreground block">LinkedIn</span>
+                      <a href={profile.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
+                        {profile.linkedin_url}
+                      </a>
+                    </div>
+                  )}
+                  {profile.portfolio_url && (
+                    <div>
+                      <span className="text-xs text-muted-foreground block">Portfolio / Website</span>
+                      <a href={profile.portfolio_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
+                        {profile.portfolio_url}
+                      </a>
+                    </div>
+                  )}
+                  {profile.resume_url && (
+                    <div>
+                      <span className="text-xs text-muted-foreground block mb-1">Resume</span>
+                      {resumeUrl ? (
+                        <a href={resumeUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
+                          View Resume
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground text-xs flex items-center gap-1.5">
+                          {isLoadingResume ? (
+                            <>
+                              <Loader2 className="h-3 w-3 animate-spin" /> Loading...
+                            </>
+                          ) : (
+                            "No resume available"
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Booking settings & metadata */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b pb-1">Booking Settings & Metadata</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-xs text-muted-foreground block">Buffer Time</span>
+                  <span>{profile.buffer_time_minutes ?? 0} min</span>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground block">Minimum Notice</span>
+                  <span>{profile.minimum_notice_hours ?? 0} hours</span>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground block">Mentee Attachments</span>
+                  <span>{profile.allow_mentee_attachments ? "Allowed" : "Not allowed"}</span>
+                </div>
+                {profile.updated_at && (
+                  <div>
+                    <span className="text-xs text-muted-foreground block">Profile Last Updated</span>
+                    <span>{formatISTDate(profile.updated_at)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

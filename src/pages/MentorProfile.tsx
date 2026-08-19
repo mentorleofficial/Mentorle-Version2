@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
@@ -33,6 +34,7 @@ import {
   Building2,
   Linkedin,
   Globe,
+  Info,
 } from "lucide-react";
 import {
   mentorProfileSchema,
@@ -286,7 +288,12 @@ const MentorProfile = () => {
     }
   };
 
-  const dirty = form.formState.isDirty || !!pendingResume || !!pendingAvatar;
+  const savedResumePath = data?.resume_url ?? "";
+  const dirty =
+    form.formState.isDirty ||
+    !!pendingResume ||
+    !!pendingAvatar ||
+    resumePath !== savedResumePath;
 
   if (isLoading || !data) {
     return (
@@ -304,6 +311,16 @@ const MentorProfile = () => {
   return (
     <AppLayout>
       <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-7xl mx-auto pb-6">
+        {!data.is_active && (
+          <Alert className="mb-6 border-sky-500/30 bg-sky-500/5">
+            <Info className="h-4 w-4 text-sky-600" />
+            <AlertTitle className="text-sky-800 dark:text-sky-300 font-semibold">Profile not live yet</AlertTitle>
+            <AlertDescription className="text-muted-foreground">
+              You can edit your profile and use all mentor tools now. Your public page and mentor directory listing will appear after an admin activates your account.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Banner header */}
         <div className="relative overflow-hidden rounded-xl border bg-card">
           <div className="h-32 bg-gradient-to-br from-primary via-primary/80 to-primary/40" />

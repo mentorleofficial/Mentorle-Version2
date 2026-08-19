@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { calculateCompleteness, type CompletenessData } from "../utils/completeness";
-import { ArrowRight, Lock, CheckCircle2, Circle, Sparkles } from "lucide-react";
+import { ArrowRight, CheckCircle2, Circle, Sparkles } from "lucide-react";
 
 interface Props {
   profileData: CompletenessData;
@@ -60,10 +60,10 @@ const MentorProfileCompletionModal = ({ profileData, isApproved }: Props) => {
             <Sparkles className="h-6 w-6 text-primary animate-pulse" />
           </div>
           <DialogTitle className="text-2xl font-serif text-center font-bold">
-            Unlock Your Booking Features!
+            Get your profile ready to go live
           </DialogTitle>
           <DialogDescription className="text-center text-sm text-muted-foreground pt-1">
-            Your mentor account has been approved by the admin. To unlock your availability calendar, program modules, bookings, and public visibility, please complete your profile to 100%.
+            Your mentor account is active. Complete your profile so mentees see a polished public page once you are listed in the directory.
           </DialogDescription>
         </DialogHeader>
 
@@ -77,7 +77,7 @@ const MentorProfileCompletionModal = ({ profileData, isApproved }: Props) => {
           {missingItems.length > 0 && (
             <div className="space-y-2">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
-                Remaining Requirements ({missingItems.length})
+                Remaining items ({missingItems.length})
               </span>
               <ul className="grid gap-2 sm:grid-cols-2 text-xs max-h-36 overflow-y-auto pr-1">
                 {missingItems.map((item) => (

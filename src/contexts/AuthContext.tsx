@@ -133,12 +133,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      const activeState = isActive && completeness === 100;
+      const mentorHasFullAccess = profileData.role === "mentor";
+      const activeState = mentorHasFullAccess ? true : isActive;
 
       setProfile(profileData);
       setMentorActive(activeState);
       setProfileCompleteness(completeness);
-      setIsApproved(isActive);
+      setIsApproved(profileData.role === "mentor" ? isActive : true);
 
       writeCache({
         profile: profileData,

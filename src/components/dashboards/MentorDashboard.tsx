@@ -170,14 +170,14 @@ const MentorDashboard = () => {
       )}
 
       {!isApproved && <InactiveMentorBanner />}
-      {isApproved && profileCompleteness < 100 && (
+      {profileCompleteness < 100 && (
         <Alert className="border-amber-500/30 bg-amber-500/5">
           <AlertCircle className="h-4 w-4 text-amber-500" />
           <AlertTitle className="text-amber-700 font-semibold">Profile Incomplete</AlertTitle>
           <AlertDescription className="text-muted-foreground">
-            Your account is approved, but you must complete your profile to 100% to unlock your availability calendar, program modules, bookings, and active features.
+            Complete your profile so mentees see your best side once your account goes live.
             <Button asChild variant="link" className="h-auto p-0 ml-1.5 text-xs text-primary font-bold">
-              <Link to="/mentor/profile">Complete Profile Now</Link>
+              <Link to="/mentor/profile">Complete profile</Link>
             </Button>
           </AlertDescription>
         </Alert>

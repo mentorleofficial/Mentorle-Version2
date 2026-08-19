@@ -95,7 +95,7 @@ const InactiveMentorBanner = () => {
         <Clock className="h-4 w-4 text-sky-600 dark:text-sky-400" />
         <AlertTitle className="text-sky-800 dark:text-sky-300 font-semibold">Application Pending Review</AlertTitle>
         <AlertDescription className="text-muted-foreground text-sm mt-1">
-          Your mentor application is currently being reviewed by our admin team. You can still customize your profile setup, but availability settings and session features will unlock once approved. We'll notify you via email as soon as a decision is made.
+          Your mentor application is currently being reviewed by our admin team. You can use all mentor tools while you wait — your public profile will go live after approval.
         </AlertDescription>
       </Alert>
     );
@@ -238,11 +238,10 @@ const InactiveMentorBanner = () => {
   return (
     <Alert className="border-accent bg-accent/10">
       <Clock className="h-4 w-4" />
-      <AlertTitle>Account Pending Activation</AlertTitle>
+      <AlertTitle>Profile not live yet</AlertTitle>
       <AlertDescription className="text-muted-foreground text-sm mt-1 space-y-3">
         <div>
-          Your mentor account is approved but not yet active. You can complete your profile while an admin
-          finalizes activation. Availability and session features will unlock once you're activated.
+          Your mentor profile is not live yet. You can set up offerings, availability, and sessions now — an admin will activate your public profile when ready.
         </div>
         <div>
           <Button size="sm" onClick={() => setShowFormDialog(true)} className="bg-primary text-primary-foreground font-medium">
