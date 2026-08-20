@@ -8,30 +8,24 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useBranding } from "@/contexts/BrandingContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import BadgeChip from "@/components/badges/BadgeChip";
 import SocialShareButtons from "@/components/SocialShareButtons";
 import { useMentorBadges } from "@/features/badges/api";
-import { ensureAbsoluteUrl } from "@/lib/utils";
+import { ensureAbsoluteUrl, cn } from "@/lib/utils";
 import {
   Briefcase,
   GraduationCap,
   Linkedin,
   Globe,
   Building2,
-  Calendar,
-  Sparkles,
   ArrowLeft,
   Star,
-  Tag,
   Clock,
-  Coins,
+  ArrowRight,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -49,6 +43,7 @@ type Experience = {
   start_date: string;
   end_date?: string;
   description?: string;
+  location?: string;
 };
 
 type PublicMentor = {
@@ -82,6 +77,12 @@ const formatMonth = (s?: string) => {
   } catch {
     return s;
   }
+};
+
+const formatPrice = (price?: number | null) => {
+  if (price == null) return "—";
+  if (price === 0) return "Free";
+  return `₹${Number(price).toLocaleString("en-IN")}`;
 };
 
 const PublicMentorProfile = () => {
@@ -125,7 +126,6 @@ const PublicMentorProfile = () => {
     setBookingModalOpen(true);
   };
 
-  // Fetch active offerings
   const { data: offerings = [] } = useQuery<any[]>({
     queryKey: ["public-offerings", mentor?.user_id],
     enabled: !!mentor?.user_id && !mentor?.is_owner_preview,
@@ -142,7 +142,6 @@ const PublicMentorProfile = () => {
   });
 
   useEffect(() => {
-    // Wait for auth to settle so owner/admin preview can use auth.uid()
     if (authLoading) return;
 
     const fetch = async () => {
@@ -173,7 +172,6 @@ const PublicMentorProfile = () => {
       const mp = list.length ? (list[0] as any) : null;
 
       if (!mp) {
-        // Client-side owner fallback (works even before the preview RPC migration is applied)
         if (user?.id) {
           let ownQuery = supabase
             .from("mentor_profiles")
@@ -226,7 +224,6 @@ const PublicMentorProfile = () => {
         return;
       }
 
-      // If accessed via UUID but slug exists, redirect to pretty URL
       if (isUuid && mp.slug) {
         navigate(`/mentor/${mp.slug}`, { replace: true });
         return;
@@ -255,7 +252,6 @@ const PublicMentorProfile = () => {
 
       if (!live) return;
 
-      // Aggregate mentor rating
       const { data: fb } = await supabase
         .from("feedback")
         .select("rating, sessions!inner(mentor_id)")
@@ -273,464 +269,419 @@ const PublicMentorProfile = () => {
 
   if (loading || authLoading) {
     return (
-      <div className="max-w-4xl mx-auto p-6 space-y-6">
-        <Skeleton className="h-48 w-full rounded-xl" />
-        <Skeleton className="h-64 w-full" />
+      <div className="min-h-screen bg-[hsl(var(--background))]">
+        <div className="mx-auto max-w-5xl px-4 py-8 space-y-6">
+          <Skeleton className="h-14 w-40" />
+          <Skeleton className="h-64 w-full rounded-2xl" />
+          <div className="grid gap-4 md:grid-cols-2">
+            <Skeleton className="h-40 rounded-2xl" />
+            <Skeleton className="h-40 rounded-2xl" />
+          </div>
+        </div>
       </div>
     );
   }
 
   if (notFound || !mentor) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <Card className="max-w-md w-full text-center">
-          <CardHeader>
-            <CardTitle>Mentor not found</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-muted-foreground text-sm">
-              This profile doesn't exist, or it isn't live yet. Public profiles only appear after an admin activates the mentor (Live).
-            </p>
-            {slugOrId && (
-              <p className="text-xs text-muted-foreground font-mono break-all">/mentor/{slugOrId}</p>
-            )}
-            {loadError && (
-              <p className="text-xs text-destructive break-all">{loadError}</p>
-            )}
-            <Button asChild variant="outline">
-              <Link to="/"><ArrowLeft className="h-4 w-4" /> Back home</Link>
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen flex items-center justify-center p-6 bg-[hsl(var(--background))]">
+        <div className="max-w-md w-full text-center space-y-4">
+          <p className="font-serif text-3xl tracking-tight">Mentor not found</p>
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            This profile doesn&apos;t exist, or it isn&apos;t live yet. Public profiles appear after an admin activates the mentor.
+          </p>
+          {slugOrId && (
+            <p className="text-xs text-muted-foreground font-mono break-all">/mentor/{slugOrId}</p>
+          )}
+          {loadError && (
+            <p className="text-xs text-destructive break-all">{loadError}</p>
+          )}
+          <Button asChild variant="outline" className="mt-2">
+            <Link to="/login">
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back to login
+            </Link>
+          </Button>
+        </div>
       </div>
     );
   }
 
   const title = `${mentor.full_name} — Mentor on ${branding.app_name}`;
   const description = mentor.headline || mentor.bio.slice(0, 155) || `Mentor with ${mentor.years_experience}+ years of experience.`;
+  const lowestPrice = offerings.length
+    ? Math.min(...offerings.map((o) => Number(o.price ?? 0)))
+    : null;
+  const shareUrl = typeof window !== "undefined" ? window.location.href : "";
 
   return (
-    <TooltipProvider>
-      <div className="min-h-screen bg-muted/20">
-        <Helmet>
-          <title>{title}</title>
-          <meta name="description" content={description} />
-          <meta property="og:title" content={title} />
-          <meta property="og:description" content={description} />
-          <meta property="og:type" content="profile" />
-          {mentor.avatar_url && <meta property="og:image" content={mentor.avatar_url} />}
-          <meta name="twitter:card" content="summary_large_image" />
-          {mentor.slug && <link rel="canonical" href={`${typeof window !== "undefined" ? window.location.origin : ""}/mentor/${mentor.slug}`} />}
-        </Helmet>
-        <div className="mx-auto max-w-7xl px-4 py-8">
-          {mentor.is_owner_preview && (
-            <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
-              Preview only — your public profile is not live yet. An admin must activate your account before mentees can open this link or book you.
+    <div className="min-h-screen bg-[hsl(var(--background))] text-foreground">
+      <Helmet>
+        <title>{title}</title>
+        <meta name="description" content={description} />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={description} />
+        <meta property="og:type" content="profile" />
+        {mentor.avatar_url && <meta property="og:image" content={mentor.avatar_url} />}
+        <meta name="twitter:card" content="summary_large_image" />
+        {mentor.slug && (
+          <link
+            rel="canonical"
+            href={`${typeof window !== "undefined" ? window.location.origin : ""}/mentor/${mentor.slug}`}
+          />
+        )}
+      </Helmet>
+
+      {/* Top bar */}
+      <header className="sticky top-0 z-30 border-b border-border/60 bg-[hsl(var(--background))]/90 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">
+          <Link to={user ? "/dashboard" : "/login"} className="flex items-center gap-2.5 min-w-0">
+            {branding.logo_url ? (
+              <img src={branding.logo_url} alt="" className="h-8 w-8 rounded-md object-cover shrink-0" />
+            ) : (
+              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground text-sm font-semibold shrink-0">
+                {branding.app_name.charAt(0)}
+              </span>
+            )}
+            <span className="font-serif text-lg tracking-tight truncate">{branding.app_name}</span>
+          </Link>
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:block">
+              <SocialShareButtons url={shareUrl} text={`Check out ${mentor.full_name} on ${branding.app_name}`} />
             </div>
-          )}
-          {/* HERO */}
-          <section className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/10 via-background to-primary/5">
-            <div className="p-8 lg:p-10">
-              <div className="flex flex-col gap-8 lg:flex-row">
-                <Avatar className="h-32 w-32 border-4 border-background shadow-xl">
-                  <AvatarImage src={mentor.avatar_url ?? undefined} />
-                  <AvatarFallback className="text-3xl">
-                    {initialsOf(mentor.full_name)}
-                  </AvatarFallback>
-                </Avatar>
-
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <h1 className="text-2xl font-bold">
-                      {mentor.full_name}
-                    </h1>
-
-                    {mentorBadges.length > 0 && (
-                      <Badge className="rounded-full">
-                        Top Mentor
-                      </Badge>
-                    )}
-                  </div>
-
-                  {mentor.headline && (
-                    <p className="mt-2 text-lg text-muted-foreground">
-                      {mentor.headline}
-                    </p>
-                  )}
-
-                  <div className="mt-6 flex flex-wrap gap-6">
-                    {mentor.current_role &&
-                      mentor.current_organization && (
-                        <div className="flex items-center gap-2">
-                          <Building2 className="h-4 w-4 text-primary" />
-                          <span>
-                            {mentor.current_role} @{" "}
-                            {mentor.current_organization}
-                          </span>
-                        </div>
-                      )}
-
-                    {mentor.years_experience > 0 && (
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-primary" />
-                        <span>
-                          {mentor.years_experience}+ years
-                        </span>
-                      </div>
-                    )}
-
-                    {rating.count > 0 && (
-                      <div className="flex items-center gap-2">
-                        <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
-                        <span>
-                          {rating.avg} ({rating.count})
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-6 flex flex-wrap gap-3">
-                    <Button size="lg" onClick={onBook}>
-                      Book Session
-                    </Button>
-
-                    {mentor.linkedin_url && (
-                      <Button variant="outline" asChild>
-                        <a
-                          href={ensureAbsoluteUrl(
-                            mentor.linkedin_url
-                          )}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Linkedin className="mr-2 h-4 w-4" />
-                          LinkedIn
-                        </a>
-                      </Button>
-                    )}
-
-                    {mentor.portfolio_url && (
-                      <Button variant="outline" asChild>
-                        <a
-                          href={ensureAbsoluteUrl(
-                            mentor.portfolio_url
-                          )}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Globe className="mr-2 h-4 w-4" />
-                          Portfolio
-                        </a>
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* MAIN GRID */}
-          <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_340px]">
-            {/* CONTENT */}
-            <div className="space-y-8">
-              {/* BADGES */}
-              {mentorBadges.length > 0 && (
-                <Card className="rounded-3xl">
-                  <CardContent className="p-6">
-                    <h3 className="mb-4 font-semibold">
-                      Achievements
-                    </h3>
-
-                    <div className="flex flex-wrap gap-2">
-                      {mentorBadges.map((mb) => (
-                        <BadgeChip
-                          key={mb.id}
-                          badge={mb.badge}
-                        />
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* ABOUT */}
-              {mentor.bio && (
-                <Card className="rounded-3xl">
-                  <CardContent className="p-8">
-                    <h2 className="mb-4 text-xl font-bold">
-                      About
-                    </h2>
-
-                    <p className="whitespace-pre-line leading-8 text-muted-foreground">
-                      {mentor.bio}
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* EXPERTISE */}
-              {mentor.expertise.length > 0 && (
-                <Card className="rounded-3xl">
-                  <CardContent className="p-8">
-                    <div className="mb-5 flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-primary" />
-                      <h2 className="text-xl font-bold">
-                        Expertise
-                      </h2>
-                    </div>
-
-                    <div className="flex flex-wrap gap-3">
-                      {mentor.expertise.map((e) => (
-                        <Badge
-                          key={e}
-                          variant="secondary"
-                          className="rounded-full px-4 py-2"
-                        >
-                          {e}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* OFFERINGS */}
-              {offerings.length > 0 && (
-                <section>
-                  <h2 className="mb-5 text-2xl font-bold">
-                    Services
-                  </h2>
-
-                  <div className="grid gap-5 md:grid-cols-2">
-                    {offerings.map((o) => (
-                      <Card
-                        key={o.id}
-                        className="overflow-hidden rounded-3xl border transition-all hover:-translate-y-1 hover:shadow-xl"
-                      >
-                        <div className="h-1 bg-gradient-to-r from-primary to-primary/40" />
-
-                        <CardContent className="p-6">
-                          <h3 className="text-lg font-semibold">
-                            {o.title}
-                          </h3>
-
-                          {o.description && (
-                            <div className="mt-3">
-                              <div
-                                className="text-sm text-muted-foreground line-clamp-3 [&_h1]:text-sm [&_h2]:text-sm [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4"
-                                dangerouslySetInnerHTML={{ __html: markdownToHtml(o.description) }}
-                              />
-                              <button
-                                onClick={() => setOfferingDetail(o)}
-                                className="mt-1 text-xs text-primary hover:underline"
-                              >
-                                Learn more
-                              </button>
-                            </div>
-                          )}
-
-                          <div className="mt-6 flex items-center justify-between">
-                            <div>
-                              <div className="text-3xl font-bold">
-                                {o.price === 0
-                                  ? "Free"
-                                  : `₹${o.price}`}
-                              </div>
-
-                              <div className="mt-1 text-sm text-muted-foreground">
-                                {o.duration_minutes} min
-                              </div>
-                            </div>
-
-                            <Clock className="h-8 w-8 text-primary/40" />
-                          </div>
-
-                          <Button
-                            className="mt-6 w-full"
-                            onClick={() => handleBook(o)}
-                          >
-                            Book Session
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              {/* OFFERING DETAIL DIALOG */}
-              <Dialog open={!!offeringDetail} onOpenChange={(open) => !open && setOfferingDetail(null)}>
-                <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>{offeringDetail?.title}</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    {offeringDetail?.description && (
-                      <div
-                        className="text-sm text-muted-foreground [&_h1]:text-base [&_h1]:font-bold [&_h2]:text-sm [&_h2]:font-semibold [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 leading-relaxed space-y-2"
-                        dangerouslySetInnerHTML={{ __html: markdownToHtml(offeringDetail.description) }}
-                      />
-                    )}
-                    <div className="flex gap-6 pt-3 border-t text-sm font-medium">
-                      <span>{offeringDetail?.duration_minutes} min</span>
-                      <span>{offeringDetail?.price === 0 ? "Free" : `₹${offeringDetail?.price}`}</span>
-                    </div>
-                    <Button
-                      className="w-full"
-                      onClick={() => { const o = offeringDetail; setOfferingDetail(null); handleBook(o); }}
-                    >
-                      Book Session
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-
-              {/* EXPERIENCE */}
-              {mentor.experiences.length > 0 && (
-                <Card className="rounded-3xl">
-                  <CardContent className="p-8">
-                    <div className="mb-8 flex items-center gap-2">
-                      <Briefcase className="h-5 w-5 text-primary" />
-                      <h2 className="text-xl font-bold">
-                        Experience
-                      </h2>
-                    </div>
-
-                    <div className="relative border-l pl-8">
-                      {mentor.experiences.map((x, i) => (
-                        <div
-                          key={i}
-                          className="relative mb-10"
-                        >
-                          <div className="absolute -left-[41px] top-1 h-4 w-4 rounded-full bg-primary" />
-
-                          <h3 className="font-semibold">
-                            {x.title}
-                          </h3>
-
-                          <p className="text-sm text-muted-foreground">
-                            {x.company}
-                          </p>
-
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {formatMonth(x.start_date)} –{" "}
-                            {formatMonth(x.end_date)}
-                          </p>
-
-                          {x.description && (
-                            <p className="mt-3 text-sm text-muted-foreground">
-                              {x.description}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* EDUCATION */}
-              {mentor.qualifications.length > 0 && (
-                <Card className="rounded-3xl">
-                  <CardContent className="p-8">
-                    <div className="mb-6 flex items-center gap-2">
-                      <GraduationCap className="h-5 w-5 text-primary" />
-                      <h2 className="text-xl font-bold">
-                        Education
-                      </h2>
-                    </div>
-
-                    <div className="space-y-6">
-                      {mentor.qualifications.map(
-                        (q, i) => (
-                          <div key={i}>
-                            <h3 className="font-semibold">
-                              {q.institution}
-                            </h3>
-
-                            <p className="text-sm text-muted-foreground">
-                              {[q.degree, q.field]
-                                .filter(Boolean)
-                                .join(" • ")}
-                            </p>
-
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {q.start_year} –{" "}
-                              {q.end_year ||
-                                "Present"}
-                            </p>
-                          </div>
-                        )
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-
-            {/* SIDEBAR */}
-            <aside>
-              <div className="sticky top-6 space-y-4">
-                <Card className="rounded-3xl border-primary/20">
-                  <CardContent className="p-6">
-                    <div className="text-center">
-                      <p className="text-sm text-muted-foreground">
-                        Starting from
-                      </p>
-
-                      <div className="mt-2 text-5xl font-bold">
-                        ₹
-                        {offerings[0]?.price ??
-                          0}
-                      </div>
-
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        per session
-                      </p>
-                    </div>
-
-                    <Button
-                      className="mt-6 w-full"
-                      size="lg"
-                      onClick={onBook}
-                    >
-                      Book Session
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-3xl">
-                  <CardContent className="p-6">
-                    <SocialShareButtons
-                      url={
-                        typeof window !== "undefined"
-                          ? window.location.href
-                          : ""
-                      }
-                      text={`Check out ${mentor.full_name}`}
-                    />
-                  </CardContent>
-                </Card>
-              </div>
-            </aside>
-          </div>
-
-          <div className="mt-10 text-center text-xs text-muted-foreground">
-            Powered by {branding.app_name}
+            <Button size="sm" className="hidden sm:inline-flex" onClick={onBook}>
+              Book session
+            </Button>
           </div>
         </div>
+      </header>
 
+      {mentor.is_owner_preview && (
+        <div className="border-b border-amber-500/25 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-950 dark:text-amber-100">
+          Preview only — your public profile is not live yet. An admin must activate your account before mentees can open this link or book you.
+        </div>
+      )}
+
+      {/* Hero */}
+      <section className="relative overflow-hidden border-b border-border/50">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-90"
+          style={{
+            background:
+              "radial-gradient(ellipse 80% 60% at 10% 0%, hsl(var(--primary) / 0.14), transparent 55%), radial-gradient(ellipse 60% 50% at 100% 20%, hsl(var(--accent) / 0.10), transparent 50%)",
+          }}
+        />
+        <div className="relative mx-auto max-w-5xl px-4 sm:px-6 pb-10 pt-8 sm:pt-12 sm:pb-14">
+          <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-end sm:gap-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <Avatar className="h-28 w-28 sm:h-36 sm:w-36 rounded-2xl border border-border/80 shadow-lg ring-4 ring-background">
+              <AvatarImage src={mentor.avatar_url ?? undefined} className="object-cover" />
+              <AvatarFallback className="rounded-2xl text-3xl font-serif bg-primary/10 text-primary">
+                {initialsOf(mentor.full_name)}
+              </AvatarFallback>
+            </Avatar>
+
+            <div className="min-w-0 flex-1 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {mentorBadges.length > 0 && (
+                  <Badge variant="secondary" className="rounded-md font-normal">
+                    Top mentor
+                  </Badge>
+                )}
+                {rating.count > 0 && (
+                  <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                    <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+                    {rating.avg}
+                    <span className="text-muted-foreground/70">({rating.count})</span>
+                  </span>
+                )}
+              </div>
+
+              <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl tracking-tight leading-[1.1]">
+                {mentor.full_name}
+              </h1>
+
+              {mentor.headline && (
+                <p className="max-w-2xl text-base sm:text-lg text-muted-foreground leading-relaxed">
+                  {mentor.headline}
+                </p>
+              )}
+
+              <div className="flex flex-wrap gap-x-5 gap-y-2 pt-1 text-sm text-muted-foreground">
+                {(mentor.current_role || mentor.current_organization) && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                    {[mentor.current_role, mentor.current_organization].filter(Boolean).join(" · ")}
+                  </span>
+                )}
+                {mentor.years_experience > 0 && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Briefcase className="h-3.5 w-3.5 text-primary shrink-0" />
+                    {mentor.years_experience}+ years experience
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Button size="lg" onClick={onBook} className="gap-2">
+                  Book a session
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+                {mentor.linkedin_url && (
+                  <Button variant="outline" size="lg" asChild>
+                    <a href={ensureAbsoluteUrl(mentor.linkedin_url)} target="_blank" rel="noopener noreferrer">
+                      <Linkedin className="mr-2 h-4 w-4" />
+                      LinkedIn
+                    </a>
+                  </Button>
+                )}
+                {mentor.portfolio_url && (
+                  <Button variant="outline" size="lg" asChild>
+                    <a href={ensureAbsoluteUrl(mentor.portfolio_url)} target="_blank" rel="noopener noreferrer">
+                      <Globe className="mr-2 h-4 w-4" />
+                      Portfolio
+                    </a>
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Body */}
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 py-10 sm:py-14 pb-28 lg:pb-14">
+        <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-16">
+          <div className="space-y-12 min-w-0">
+            {mentorBadges.length > 0 && (
+              <section className="animate-in fade-in duration-700">
+                <h2 className="font-serif text-2xl tracking-tight mb-4">Achievements</h2>
+                <div className="flex flex-wrap gap-2">
+                  {mentorBadges.map((mb) => (
+                    <BadgeChip key={mb.id} badge={mb.badge} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {mentor.bio && (
+              <section>
+                <h2 className="font-serif text-2xl tracking-tight mb-4">About</h2>
+                <p className="whitespace-pre-line text-[15px] sm:text-base leading-7 text-muted-foreground">
+                  {mentor.bio}
+                </p>
+              </section>
+            )}
+
+            {mentor.expertise.length > 0 && (
+              <section>
+                <h2 className="font-serif text-2xl tracking-tight mb-4">Expertise</h2>
+                <div className="flex flex-wrap gap-2">
+                  {mentor.expertise.map((e) => (
+                    <span
+                      key={e}
+                      className="inline-flex rounded-full border border-border bg-secondary/60 px-3.5 py-1.5 text-sm"
+                    >
+                      {e}
+                    </span>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {offerings.length > 0 && (
+              <section id="services">
+                <div className="mb-5 flex items-end justify-between gap-3">
+                  <h2 className="font-serif text-2xl tracking-tight">Sessions</h2>
+                  {lowestPrice != null && (
+                    <p className="text-sm text-muted-foreground">
+                      From {formatPrice(lowestPrice)}
+                    </p>
+                  )}
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {offerings.map((o) => (
+                    <article
+                      key={o.id}
+                      className={cn(
+                        "group flex flex-col rounded-2xl border border-border bg-card p-5",
+                        "transition-all duration-300 hover:border-primary/35 hover:shadow-md",
+                      )}
+                    >
+                      <h3 className="font-semibold text-base leading-snug">{o.title}</h3>
+                      {o.description && (
+                        <div className="mt-2 flex-1">
+                          <div
+                            className="text-sm text-muted-foreground line-clamp-3 [&_p]:m-0 [&_ul]:list-disc [&_ul]:pl-4"
+                            dangerouslySetInnerHTML={{ __html: markdownToHtml(o.description) }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setOfferingDetail(o)}
+                            className="mt-1.5 text-xs font-medium text-primary hover:underline"
+                          >
+                            Learn more
+                          </button>
+                        </div>
+                      )}
+                      <div className="mt-5 flex items-center justify-between gap-3 border-t border-border/70 pt-4">
+                        <div>
+                          <p className="text-xl font-semibold tracking-tight">{formatPrice(o.price)}</p>
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <Clock className="h-3 w-3" />
+                            {o.duration_minutes} min
+                          </p>
+                        </div>
+                        <Button size="sm" onClick={() => handleBook(o)}>
+                          Book
+                        </Button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {mentor.experiences.length > 0 && (
+              <section>
+                <h2 className="font-serif text-2xl tracking-tight mb-6">Experience</h2>
+                <ol className="relative space-y-0 border-l border-border ml-2">
+                  {mentor.experiences.map((x, i) => (
+                    <li key={i} className="relative pl-6 pb-8 last:pb-0">
+                      <span className="absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
+                      <h3 className="font-semibold leading-snug">{x.title}</h3>
+                      <p className="text-sm text-muted-foreground mt-0.5">{x.company}</p>
+                      <p className="text-xs text-muted-foreground/80 mt-1">
+                        {formatMonth(x.start_date)} – {formatMonth(x.end_date)}
+                        {x.location ? ` · ${x.location}` : ""}
+                      </p>
+                      {x.description && (
+                        <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{x.description}</p>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
+
+            {mentor.qualifications.length > 0 && (
+              <section>
+                <h2 className="font-serif text-2xl tracking-tight mb-5">Education</h2>
+                <ul className="space-y-5">
+                  {mentor.qualifications.map((q, i) => (
+                    <li key={i} className="flex gap-3">
+                      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <GraduationCap className="h-4 w-4" />
+                      </span>
+                      <div>
+                        <h3 className="font-semibold leading-snug">{q.institution}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {[q.degree, q.field].filter(Boolean).join(" · ")}
+                        </p>
+                        <p className="text-xs text-muted-foreground/80 mt-0.5">
+                          {q.start_year} – {q.end_year || "Present"}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
+
+          {/* Desktop sidebar */}
+          <aside className="hidden lg:block">
+            <div className="sticky top-20 space-y-4">
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Book with {mentor.full_name.split(" ")[0]}</p>
+                {lowestPrice != null ? (
+                  <p className="mt-2 font-serif text-3xl tracking-tight">
+                    {formatPrice(lowestPrice)}
+                    <span className="ml-1 text-sm font-sans font-normal text-muted-foreground">from</span>
+                  </p>
+                ) : (
+                  <p className="mt-2 text-sm text-muted-foreground">Sessions available on request</p>
+                )}
+                <Button className="mt-4 w-full" size="lg" onClick={onBook}>
+                  Book session
+                </Button>
+                {offerings.length > 0 && (
+                  <a href="#services" className="mt-3 block text-center text-xs text-primary hover:underline">
+                    View {offerings.length} session{offerings.length === 1 ? "" : "s"}
+                  </a>
+                )}
+              </div>
+              <div className="rounded-2xl border border-border bg-card/60 p-4">
+                <SocialShareButtons
+                  url={shareUrl}
+                  text={`Check out ${mentor.full_name} on ${branding.app_name}`}
+                  label="Share profile"
+                />
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <p className="mt-16 text-center text-xs text-muted-foreground">
+          Powered by {branding.app_name}
+        </p>
       </div>
 
-      {mentor && (
-        <BookingModal
-          mentorId={mentor.user_id}
-          offeringId={bookingOffering?.id}
-          open={bookingModalOpen}
-          onOpenChange={(open) => { if (!open) { setBookingModalOpen(false); setBookingOffering(null); } }}
-        />
-      )}
-    </TooltipProvider>
+      {/* Mobile sticky CTA */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-[hsl(var(--background))]/95 backdrop-blur-md p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
+        <div className="mx-auto flex max-w-5xl items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium truncate">{mentor.full_name}</p>
+            <p className="text-xs text-muted-foreground">
+              {lowestPrice != null ? `From ${formatPrice(lowestPrice)}` : "Book a session"}
+            </p>
+          </div>
+          <Button onClick={onBook} className="shrink-0">
+            Book
+          </Button>
+        </div>
+      </div>
+
+      <Dialog open={!!offeringDetail} onOpenChange={(open) => !open && setOfferingDetail(null)}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl">{offeringDetail?.title}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {offeringDetail?.description && (
+              <div
+                className="text-sm text-muted-foreground [&_h1]:text-base [&_h1]:font-bold [&_h2]:text-sm [&_h2]:font-semibold [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 leading-relaxed space-y-2"
+                dangerouslySetInnerHTML={{ __html: markdownToHtml(offeringDetail.description) }}
+              />
+            )}
+            <div className="flex gap-6 pt-3 border-t text-sm font-medium">
+              <span>{offeringDetail?.duration_minutes} min</span>
+              <span>{formatPrice(offeringDetail?.price)}</span>
+            </div>
+            <Button
+              className="w-full"
+              onClick={() => {
+                const o = offeringDetail;
+                setOfferingDetail(null);
+                handleBook(o);
+              }}
+            >
+              Book session
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <BookingModal
+        mentorId={mentor.user_id}
+        offeringId={bookingOffering?.id}
+        open={bookingModalOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setBookingModalOpen(false);
+            setBookingOffering(null);
+          }
+        }}
+      />
+    </div>
   );
 };
 
