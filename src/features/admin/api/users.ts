@@ -21,6 +21,7 @@ export type FetchUsersParams = {
   pageSize: number;
   role: RoleFilter;
   status?: StatusFilter;
+  search?: string;
 };
 
 export type FetchUsersResult = {
@@ -28,14 +29,25 @@ export type FetchUsersResult = {
   total: number;
 };
 
+/** Escape LIKE wildcards and characters that break PostgREST `.or()` filters. */
+function escapeIlikePattern(value: string) {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_")
+    .replace(/"/g, "");
+}
+
 export async function fetchAdminUsers({
   page,
   pageSize,
   role,
   status = "active",
+  search = "",
 }: FetchUsersParams): Promise<FetchUsersResult> {
   const from = page * pageSize;
   const to = from + pageSize - 1;
+  const q = search.trim();
 
   let query = supabase
     .from("users")
@@ -49,6 +61,10 @@ export async function fetchAdminUsers({
   if (role !== "all") query = query.eq("role", role);
   if (status === "active") query = query.eq("is_disabled", false);
   else if (status === "disabled") query = query.eq("is_disabled", true);
+  if (q) {
+    const pattern = `%${escapeIlikePattern(q)}%`;
+    query = query.or(`full_name.ilike."${pattern}",email.ilike."${pattern}"`);
+  }
 
   const { data, error, count } = await query;
   if (error) throw error;
@@ -71,9 +87,30 @@ export async function fetchAdminUsers({
 }
 
 export async function toggleMentorActive(userId: string, isActive: boolean) {
+  const patch: { user_id: string; is_active: boolean; slug?: string } = {
+    user_id: userId,
+    is_active: isActive,
+  };
+
+  if (isActive) {
+    const [{ data: mp }, { data: u }] = await Promise.all([
+      supabase.from("mentor_profiles").select("slug").eq("user_id", userId).maybeSingle(),
+      supabase.from("users").select("full_name").eq("id", userId).maybeSingle(),
+    ]);
+    if (!mp?.slug) {
+      const { data: slugData } = await supabase.rpc("generate_mentor_slug", {
+        _full_name: u?.full_name || "mentor",
+        _user_id: userId,
+      });
+      if (typeof slugData === "string" && slugData) {
+        patch.slug = slugData;
+      }
+    }
+  }
+
   const { error } = await supabase
     .from("mentor_profiles")
-    .upsert({ user_id: userId, is_active: isActive }, { onConflict: "user_id" });
+    .upsert(patch, { onConflict: "user_id" });
   if (error) throw error;
 }
 

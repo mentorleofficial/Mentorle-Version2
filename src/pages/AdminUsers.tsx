@@ -1,5 +1,5 @@
 import { formatISTDate } from "@/lib/datetime";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -54,13 +54,19 @@ const AdminUsers = () => {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    const t = setTimeout(() => setSearch(searchInput.trim().toLowerCase()), 200);
+    const t = setTimeout(() => setSearch(searchInput.trim()), 200);
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  useEffect(() => { setPage(0); }, [roleFilter, statusFilter]);
+  useEffect(() => { setPage(0); }, [roleFilter, statusFilter, search]);
 
-  const queryParams = { page, pageSize: PAGE_SIZE, role: roleFilter, status: statusFilter };
+  const queryParams = {
+    page,
+    pageSize: PAGE_SIZE,
+    role: roleFilter,
+    status: statusFilter,
+    search,
+  };
   const { data, isLoading, isFetching } = useAdminUsers(queryParams);
   const toggleMutation = useToggleMentorActive(queryParams);
   const createMutation = useCreateUser();
@@ -76,18 +82,9 @@ const AdminUsers = () => {
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [detailsUser, setDetailsUser] = useState<{ id: string; role: AppRole } | null>(null);
 
-  const rows = data?.rows ?? [];
+  const filtered = data?.rows ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
-  const filtered = useMemo(() => {
-    if (!search) return rows;
-    return rows.filter(
-      (u) =>
-        u.full_name.toLowerCase().includes(search) ||
-        u.email.toLowerCase().includes(search),
-    );
-  }, [rows, search]);
 
   const resetForm = () => {
     setNewEmail(""); setNewName(""); setNewPassword(""); setNewRole("mentee");
@@ -811,12 +808,12 @@ const UserDetailsDialogContent = ({ userId, role }: { userId: string; role: AppR
                   <div className="md:col-span-2">
                     <span className="text-xs text-muted-foreground block">Public Profile</span>
                     <a
-                      href={`/mentors/${profile.slug}`}
+                      href={`/mentor/${profile.slug}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary hover:underline break-all"
                     >
-                      /mentors/{profile.slug}
+                      /mentor/{profile.slug}
                     </a>
                   </div>
                 )}

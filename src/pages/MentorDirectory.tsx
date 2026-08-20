@@ -473,7 +473,8 @@ const MentorDirectory = () => {
                       <button
                         onClick={async (e) => {
                           e.stopPropagation();
-                          const url = `${window.location.origin}/mentors/${m.id}`;
+                          const handle = m.slug || m.id;
+                          const url = `${window.location.origin}/mentor/${handle}`;
                           try {
                             await navigator.clipboard.writeText(url);
                             setSharedId(m.id);

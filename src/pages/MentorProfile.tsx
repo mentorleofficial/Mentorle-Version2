@@ -350,15 +350,23 @@ const MentorProfile = () => {
                   </div>
                 </div>
               </div>
-              {data.is_active && userId && (
+              {userId && (
                 <div className="flex flex-wrap gap-2">
+                  {(data as any)?.slug && (
+                    <p className="w-full text-xs text-muted-foreground font-mono break-all">
+                      Public URL: {window.location.origin}/mentor/{(data as any).slug}
+                      {!data.is_active && " (not live yet — mentees can't open this until admin activates you)"}
+                    </p>
+                  )}
+                  {data.is_active && (
+                    <>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={async () => {
                       const handle = (data as any)?.slug || userId;
-                      const url = `${window.location.origin}/mentors/${handle}`;
+                      const url = `${window.location.origin}/mentor/${handle}`;
                       await navigator.clipboard.writeText(url);
                       toast({ title: "Link copied", description: "Your public profile URL is on your clipboard." });
                     }}
@@ -370,7 +378,7 @@ const MentorProfile = () => {
                     size="sm"
                     onClick={async () => {
                       const handle = (data as any)?.slug || userId;
-                      const url = `${window.location.origin}/mentors/${handle}`;
+                      const url = `${window.location.origin}/mentor/${handle}`;
                       const caption = `Excited to share my mentor profile on ${document.title.split(" ")[0] || "Mentorle"}! 🚀\n\nIf you'd like guidance, let's connect.\n\nCheck out my profile: ${url}`;
                       try {
                         await navigator.clipboard.writeText(caption);
@@ -386,6 +394,8 @@ const MentorProfile = () => {
                   >
                     Share on LinkedIn
                   </Button>
+                    </>
+                  )}
                 </div>
               )}
             </div>

@@ -16,7 +16,15 @@ import {
 } from "../api/users";
 
 const adminUsersKey = (params: FetchUsersParams) =>
-  ["admin", "users", params.page, params.pageSize, params.role, params.status ?? "active"] as const;
+  [
+    "admin",
+    "users",
+    params.page,
+    params.pageSize,
+    params.role,
+    params.status ?? "active",
+    params.search?.trim() ?? "",
+  ] as const;
 
 export function useAdminUsers(params: FetchUsersParams) {
   return useQuery({

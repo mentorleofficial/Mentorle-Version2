@@ -3078,6 +3078,7 @@ export type Database = {
           expertise: string[]
           full_name: string
           headline: string
+          is_active: boolean
           linkedin_url: string
           portfolio_url: string
           qualifications: Json

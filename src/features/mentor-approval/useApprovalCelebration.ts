@@ -10,12 +10,12 @@ export type ApprovalState = {
   acknowledge: () => Promise<void>;
 };
 
-const buildPublicUrl = (userId: string) => {
+const buildPublicUrl = (handle: string) => {
   const origin =
     typeof window !== "undefined" && window.location?.origin
       ? window.location.origin
       : "";
-  return `${origin}/mentors/${userId}`;
+  return `${origin}/mentor/${handle}`;
 };
 
 export function useApprovalCelebration(): ApprovalState {

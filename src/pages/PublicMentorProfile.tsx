@@ -66,6 +66,8 @@ type PublicMentor = {
   portfolio_url: string;
   qualifications: Qualification[];
   experiences: Experience[];
+  is_live?: boolean;
+  is_owner_preview?: boolean;
 };
 
 const initialsOf = (name: string) =>
@@ -83,25 +85,36 @@ const formatMonth = (s?: string) => {
 };
 
 const PublicMentorProfile = () => {
-  const { mentorId } = useParams<{ mentorId: string }>();
+  const { slug: slugOrId } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const { user, role } = useAuth();
+  const { user, role, loading: authLoading } = useAuth();
   const branding = useBranding();
   const { toast } = useToast();
   const [mentor, setMentor] = useState<PublicMentor | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [rating, setRating] = useState<{ avg: number; count: number }>({ avg: 0, count: 0 });
   const [offeringDetail, setOfferingDetail] = useState<any>(null);
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [bookingOffering, setBookingOffering] = useState<any>(null);
   const { data: mentorBadges = [] } = useMentorBadges(mentor?.user_id);
-  const bookingTargetId = mentor?.user_id ?? mentorId;
+  const bookingTargetId = mentor?.user_id ?? slugOrId;
+
+  const publicProfilePath = mentor?.slug
+    ? `/mentor/${mentor.slug}`
+    : `/mentor/${bookingTargetId}`;
 
   const handleBook = (offering?: any) => {
+    if (mentor?.is_owner_preview) {
+      toast({
+        title: "Profile not live yet",
+        description: "Mentees can book only after an admin activates your public profile.",
+      });
+      return;
+    }
     if (!user) {
-      const profilePath = mentor?.slug ? `/mentors/${mentor.slug}` : `/mentors/${bookingTargetId}`;
-      navigate(`/login?redirect=${encodeURIComponent(profilePath)}`);
+      navigate(`/login?redirect=${encodeURIComponent(publicProfilePath)}`);
       return;
     }
     if (role !== "mentee") {
@@ -115,7 +128,7 @@ const PublicMentorProfile = () => {
   // Fetch active offerings
   const { data: offerings = [] } = useQuery<any[]>({
     queryKey: ["public-offerings", mentor?.user_id],
-    enabled: !!mentor?.user_id,
+    enabled: !!mentor?.user_id && !mentor?.is_owner_preview,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("mentorship_offerings")
@@ -129,18 +142,85 @@ const PublicMentorProfile = () => {
   });
 
   useEffect(() => {
-    const fetch = async () => {
-      if (!mentorId) return;
-      setLoading(true);
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(mentorId);
+    // Wait for auth to settle so owner/admin preview can use auth.uid()
+    if (authLoading) return;
 
-      // SECURITY DEFINER RPC: returns only public-safe mentor fields, no email.
-      const { data: rows } = await supabase.rpc("get_public_mentor", {
-        _slug_or_id: mentorId,
+    const fetch = async () => {
+      if (!slugOrId) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      setNotFound(false);
+      setLoadError(null);
+      setMentor(null);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId);
+
+      const { data: rows, error: rpcError } = await supabase.rpc("get_public_mentor", {
+        _slug_or_id: slugOrId,
       });
-      const mp = Array.isArray(rows) && rows.length ? (rows[0] as any) : null;
+
+      if (rpcError) {
+        console.error("[public-mentor] get_public_mentor failed", rpcError);
+        setLoadError(rpcError.message || "Failed to load mentor profile");
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+
+      const list = Array.isArray(rows) ? rows : rows ? [rows] : [];
+      const mp = list.length ? (list[0] as any) : null;
 
       if (!mp) {
+        // Client-side owner fallback (works even before the preview RPC migration is applied)
+        if (user?.id) {
+          let ownQuery = supabase
+            .from("mentor_profiles")
+            .select("user_id, slug, is_active, headline, bio, expertise, years_experience, current_organization, current_role, linkedin_url, portfolio_url, qualifications, experiences")
+            .eq("user_id", user.id);
+          if (isUuid) {
+            if (slugOrId.toLowerCase() !== user.id.toLowerCase()) {
+              setNotFound(true);
+              setLoading(false);
+              return;
+            }
+          } else {
+            ownQuery = ownQuery.eq("slug", slugOrId);
+          }
+          const { data: own } = await ownQuery.maybeSingle();
+          if (own && own.user_id === user.id) {
+            const { data: u } = await supabase
+              .from("users")
+              .select("full_name, avatar_url")
+              .eq("id", user.id)
+              .maybeSingle();
+            if (isUuid && own.slug) {
+              navigate(`/mentor/${own.slug}`, { replace: true });
+              return;
+            }
+            setMentor({
+              user_id: own.user_id,
+              slug: own.slug ?? null,
+              full_name: u?.full_name ?? "Mentor",
+              avatar_url: u?.avatar_url ?? null,
+              headline: own.headline ?? "",
+              bio: own.bio ?? "",
+              expertise: own.expertise ?? [],
+              years_experience: own.years_experience ?? 0,
+              current_organization: own.current_organization ?? "",
+              current_role: own.current_role ?? "",
+              linkedin_url: own.linkedin_url ?? "",
+              portfolio_url: own.portfolio_url ?? "",
+              qualifications: (own.qualifications as Qualification[]) ?? [],
+              experiences: (own.experiences as Experience[]) ?? [],
+              is_live: !!own.is_active,
+              is_owner_preview: !own.is_active,
+            });
+            setLoading(false);
+            return;
+          }
+        }
         setNotFound(true);
         setLoading(false);
         return;
@@ -148,10 +228,11 @@ const PublicMentorProfile = () => {
 
       // If accessed via UUID but slug exists, redirect to pretty URL
       if (isUuid && mp.slug) {
-        navigate(`/mentors/${mp.slug}`, { replace: true });
+        navigate(`/mentor/${mp.slug}`, { replace: true });
         return;
       }
 
+      const live = mp.is_active !== false;
       setMentor({
         user_id: mp.user_id,
         slug: mp.slug ?? null,
@@ -167,8 +248,12 @@ const PublicMentorProfile = () => {
         portfolio_url: mp.portfolio_url ?? "",
         qualifications: (mp.qualifications as Qualification[]) ?? [],
         experiences: (mp.experiences as Experience[]) ?? [],
+        is_live: live,
+        is_owner_preview: !live,
       });
       setLoading(false);
+
+      if (!live) return;
 
       // Aggregate mentor rating
       const { data: fb } = await supabase
@@ -182,11 +267,11 @@ const PublicMentorProfile = () => {
       }
     };
     fetch();
-  }, [mentorId]);
+  }, [slugOrId, navigate, user?.id, authLoading]);
 
   const onBook = () => handleBook();
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="max-w-4xl mx-auto p-6 space-y-6">
         <Skeleton className="h-48 w-full rounded-xl" />
@@ -204,8 +289,14 @@ const PublicMentorProfile = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-muted-foreground text-sm">
-              This profile doesn't exist or isn't currently active.
+              This profile doesn't exist, or it isn't live yet. Public profiles only appear after an admin activates the mentor (Live).
             </p>
+            {slugOrId && (
+              <p className="text-xs text-muted-foreground font-mono break-all">/mentor/{slugOrId}</p>
+            )}
+            {loadError && (
+              <p className="text-xs text-destructive break-all">{loadError}</p>
+            )}
             <Button asChild variant="outline">
               <Link to="/"><ArrowLeft className="h-4 w-4" /> Back home</Link>
             </Button>
@@ -229,8 +320,14 @@ const PublicMentorProfile = () => {
           <meta property="og:type" content="profile" />
           {mentor.avatar_url && <meta property="og:image" content={mentor.avatar_url} />}
           <meta name="twitter:card" content="summary_large_image" />
+          {mentor.slug && <link rel="canonical" href={`${typeof window !== "undefined" ? window.location.origin : ""}/mentor/${mentor.slug}`} />}
         </Helmet>
         <div className="mx-auto max-w-7xl px-4 py-8">
+          {mentor.is_owner_preview && (
+            <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+              Preview only — your public profile is not live yet. An admin must activate your account before mentees can open this link or book you.
+            </div>
+          )}
           {/* HERO */}
           <section className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/10 via-background to-primary/5">
             <div className="p-8 lg:p-10">

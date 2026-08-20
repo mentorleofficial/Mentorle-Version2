@@ -50,6 +50,7 @@ const SessionFeedback = lazy(() => import("@/pages/SessionFeedback"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const JwtCallback = lazy(() => import("@/pages/JwtCallback"));
 const PublicMentorProfile = lazy(() => import("@/pages/PublicMentorProfile"));
+const LegacyPublicMentorRedirect = lazy(() => import("@/pages/LegacyPublicMentorRedirect"));
 const AccountPrivacy = lazy(() => import("@/pages/AccountPrivacy"));
 const AdminPrivacyRequests = lazy(() => import("@/pages/AdminPrivacyRequests"));
 const MentorLeaderboard = lazy(() => import("@/pages/MentorLeaderboard"));
@@ -86,7 +87,7 @@ const App = () => (
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/become-a-mentor" element={<MentorLanding />} />
                   <Route path="/signup" element={<MenteeLanding />} />
-                  <Route path="/mentors/:mentorId" element={<PublicMentorProfile />} />
+                  <Route path="/mentors/:mentorId" element={<LegacyPublicMentorRedirect />} />
                   <Route path="/auth/jwt/callback" element={<JwtCallback />} />
                   <Route path="/admin/applications" element={<RoleGuard allowedRoles={["admin"]}><AdminApplications /></RoleGuard>} />
                   <Route path="/admin/programs" element={<RoleGuard allowedRoles={["admin"]}><AdminPrograms /></RoleGuard>} />
@@ -122,6 +123,8 @@ const App = () => (
                   <Route path="/mentor/events" element={<RoleGuard allowedRoles={["mentor"]}><MentorEvents /></RoleGuard>} />
                   <Route path="/mentor/leaderboard" element={<RoleGuard allowedRoles={["mentor", "admin"]}><MentorLeaderboard /></RoleGuard>} />
                   <Route path="/mentor/earnings" element={<RoleGuard allowedRoles={["mentor"]}><MentorEarnings /></RoleGuard>} />
+                  {/* Public mentor profile — after static /mentor/* app routes so reserved paths win */}
+                  <Route path="/mentor/:slug" element={<PublicMentorProfile />} />
                   <Route path="/onboarding/mentee" element={<RoleGuard allowedRoles={["mentee"]}><MenteeOnboarding /></RoleGuard>} />
                   <Route path="/mentee/profile" element={<RoleGuard allowedRoles={["mentee"]}><MenteeProfile /></RoleGuard>} />
                   <Route path="/mentee/sessions" element={<RoleGuard allowedRoles={["mentee"]}><MenteeOnboardingGuard><MenteeSessions /></MenteeOnboardingGuard></RoleGuard>} />
