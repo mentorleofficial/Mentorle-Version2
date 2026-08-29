@@ -321,7 +321,7 @@ const MenteeOnboarding = () => {
       {step === 2 && (
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="goals">What do you want to achieve?</Label>
+            <Label htmlFor="goals">What do you want to achieve?(min 20 characters)</Label>
             <Textarea
               id="goals"
               rows={4}
