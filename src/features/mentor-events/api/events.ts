@@ -213,20 +213,68 @@ export async function deleteEventBanner(bannerUrl: string): Promise<void> {
 }
 
 // Fetch event participants
-export async function fetchEventParticipants(eventId: string): Promise<EventParticipant[]> {
-  const { data, error } = await supabase
-    .from("event_participants" as any)
-    .select(`
-      id,
-      registered_at,
-      user_profiles:users (
-        full_name,
-        email
-      )
-    `)
+async function fetchEventParticipantsDirect(eventId: string): Promise<EventParticipant[]> {
+  const { data: rows, error } = await supabase
+    .from("event_participants")
+    .select("id, registered_at, user_id")
     .eq("event_id", eventId)
     .order("registered_at", { ascending: false });
 
   if (error) throw error;
-  return (data || []) as unknown as EventParticipant[];
+  if (!rows?.length) return [];
+
+  const userIds = [...new Set(rows.map((r) => r.user_id).filter(Boolean))] as string[];
+  const userMap = new Map<string, { full_name: string | null; email: string | null }>();
+
+  if (userIds.length > 0) {
+    const { data: users, error: usersError } = await supabase
+      .from("users")
+      .select("id, full_name, email")
+      .in("id", userIds);
+
+    if (usersError) throw usersError;
+    for (const user of users ?? []) {
+      userMap.set(user.id, { full_name: user.full_name, email: user.email });
+    }
+  }
+
+  return rows.map((row) => ({
+    id: row.id,
+    registered_at: row.registered_at ?? "",
+    user_profiles: row.user_id
+      ? userMap.get(row.user_id) ?? { full_name: null, email: null }
+      : null,
+  }));
+}
+
+function isMissingParticipantsRpc(error: { code?: string; message?: string }): boolean {
+  return (
+    error.code === "PGRST202" ||
+    error.code === "42883" ||
+    Boolean(error.message?.includes("get_event_participants"))
+  );
+}
+
+export async function fetchEventParticipants(eventId: string): Promise<EventParticipant[]> {
+  const { data, error } = await supabase.rpc("get_event_participants", {
+    _event_id: eventId,
+  });
+
+  if (!error) {
+    return (data ?? []).map((row) => ({
+      id: row.id,
+      registered_at: row.registered_at ?? "",
+      user_profiles: {
+        full_name: row.full_name,
+        email: row.email,
+      },
+    }));
+  }
+
+  // RPC not deployed yet — fall back to direct queries (works for admin/event creator RLS).
+  if (isMissingParticipantsRpc(error)) {
+    return fetchEventParticipantsDirect(eventId);
+  }
+
+  throw error;
 }

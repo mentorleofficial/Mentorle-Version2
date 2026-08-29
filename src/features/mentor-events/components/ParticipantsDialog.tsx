@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Users, Mail, Calendar } from "lucide-react";
+import { Users, Mail, Calendar, AlertCircle } from "lucide-react";
 import { useEventParticipants } from "../useMentorEvents";
 import { formatISTDate } from "@/lib/datetime";
 import type { EventProgram } from "../api/events";
@@ -12,10 +12,10 @@ interface ParticipantsDialogProps {
 }
 
 export default function ParticipantsDialog({ isOpen, onClose, event }: ParticipantsDialogProps) {
-  const { data: participants = [], isLoading } = useEventParticipants(event?.id);
+  const { data: participants = [], isLoading, isError, error } = useEventParticipants(event?.id);
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -28,6 +28,16 @@ export default function ParticipantsDialog({ isOpen, onClose, event }: Participa
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : isError ? (
+            <div className="text-center py-12">
+              <AlertCircle className="h-12 w-12 text-destructive/70 mx-auto mb-4" />
+              <p className="text-sm font-semibold text-foreground">Could not load participants</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {error && typeof error === "object" && "message" in error
+                  ? String((error as { message: unknown }).message)
+                  : "Please try again."}
+              </p>
             </div>
           ) : participants.length === 0 ? (
             <div className="text-center py-12">

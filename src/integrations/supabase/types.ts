@@ -3005,6 +3005,15 @@ export type Database = {
           scheduled_at: string
         }[]
       }
+      get_event_participants: {
+        Args: { _event_id: string }
+        Returns: {
+          email: string | null
+          full_name: string | null
+          id: string
+          registered_at: string | null
+        }[]
+      }
       get_mentee_profile_for_mentor: {
         Args: { _mentee_id: string }
         Returns: {
