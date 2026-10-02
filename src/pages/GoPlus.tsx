@@ -142,7 +142,7 @@ const GoPlus = () => {
           <Card>
             <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
               <div>
-                <p className="flex items-center gap-2 font-medium">
+                <div className="flex items-center gap-2 font-medium">
                   Your membership
                   <Badge variant={isActive ? "default" : "secondary"} className="capitalize">
                     {membership.status}
@@ -152,7 +152,7 @@ const GoPlus = () => {
                       {membership.plan.interval === "year" ? "Yearly" : "Monthly"}
                     </Badge>
                   )}
-                </p>
+                </div>
                 {membership.current_period_end && (
                   <p className="mt-0.5 text-sm text-muted-foreground">
                     {isActive && !membership.cancel_at_period_end ? "Renews" : "Ends"} on{" "}

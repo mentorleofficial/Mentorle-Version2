@@ -87,6 +87,7 @@ Deno.serve(async (req) => {
       { user_id: mentorUserId, role: "mentor" },
       { onConflict: "user_id,role" }
     );
+    await admin.from("user_roles").delete().eq("user_id", mentorUserId).eq("role", "mentee");
     await admin.from("users").update({ role: "mentor", full_name: app.full_name }).eq("id", mentorUserId);
 
     // Generate slug from applicant's full name
@@ -126,11 +127,13 @@ Deno.serve(async (req) => {
       })
       .eq("id", application_id);
 
-    // Delete any other historical applications for the same email (e.g. previous rejections)
+    // Delete any other historical applications for the same email (e.g. previous rejections).
+    // Escape LIKE wildcards so "john_doe@x.com" cannot match "john.doe@x.com".
+    const exactEmailPattern = app.email.replace(/[\\%_]/g, (c: string) => `\\${c}`);
     await admin
       .from("mentor_applications")
       .delete()
-      .ilike("email", app.email)
+      .ilike("email", exactEmailPattern)
       .neq("id", application_id);
 
 
