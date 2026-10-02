@@ -1,6 +1,6 @@
--- Permanent removal of the legacy mentorle.in tables hidden by 20261001110000, after the
--- 3-day observation window. Move into supabase/migrations only when that window has passed
--- with no problems. A copy of every table is in db backup/2026-10-01/legacy_tables.sql.
+-- Permanent removal of the legacy mentorle.in tables hidden by 20261001110000. Applied early
+-- (instead of after the planned 3-day window) at the owner's request, after a full local
+-- rehearsal and live read-only checks. A copy of every table is in db backup/2026-10-01/legacy_tables.sql.
 DROP SCHEMA IF EXISTS legacy_archive CASCADE;
 
 -- Leftover functions from the old site. No CASCADE: if anything still depends on one,

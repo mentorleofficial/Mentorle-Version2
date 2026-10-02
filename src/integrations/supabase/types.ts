@@ -2132,10 +2132,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      increment_post_view_count: {
-        Args: { p_ip_address?: string; p_post_id: string; p_viewer_id?: string }
-        Returns: undefined
-      }
       is_feedback_subject: {
         Args: { _feedback_id: string; _user_id: string }
         Returns: boolean
@@ -2246,52 +2242,16 @@ export type Database = {
         | "approved"
         | "rejected"
         | "changes_requested"
-      article_status: "draft" | "pending" | "published" | "archived"
       badge_tier: "bronze" | "silver" | "gold"
       dsr_kind: "export" | "correction" | "deletion" | "withdrawal"
       dsr_status: "pending" | "in_review" | "completed" | "rejected"
-      event_status:
-        | "draft"
-        | "published"
-        | "cancelled"
-        | "completed"
-        | "postponed"
       feedback_audience: "mentor" | "mentee" | "admin_private"
-      feedback_target_type:
-        | "mentor"
-        | "mentee"
-        | "event"
-        | "workshop"
-        | "hackathon"
-        | "article"
-        | "team"
-        | "institute"
-        | "other"
       general_feedback_category:
         | "feedback"
         | "concern"
         | "suggestion"
         | "review"
-      outbound_event_status: "pending" | "sent" | "failed"
-      payment_status:
-        | "pending"
-        | "initiated"
-        | "succeeded"
-        | "failed"
-        | "refunded"
-        | "cancelled"
-      payout_status: "pending" | "paid" | "failed" | "cancelled"
-      refund_status: "pending" | "succeeded" | "failed" | "cancelled"
-      registration_status:
-        | "registered"
-        | "confirmed"
-        | "cancelled"
-        | "checked_in"
-        | "no_show"
-        | "waitlisted"
-        | "refunded"
       session_status: "booked" | "completed" | "cancelled" | "no_show"
-      ticket_type: "free" | "paid" | "donation"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2429,57 +2389,17 @@ export const Constants = {
         "rejected",
         "changes_requested",
       ],
-      article_status: ["draft", "pending", "published", "archived"],
       badge_tier: ["bronze", "silver", "gold"],
       dsr_kind: ["export", "correction", "deletion", "withdrawal"],
       dsr_status: ["pending", "in_review", "completed", "rejected"],
-      event_status: [
-        "draft",
-        "published",
-        "cancelled",
-        "completed",
-        "postponed",
-      ],
       feedback_audience: ["mentor", "mentee", "admin_private"],
-      feedback_target_type: [
-        "mentor",
-        "mentee",
-        "event",
-        "workshop",
-        "hackathon",
-        "article",
-        "team",
-        "institute",
-        "other",
-      ],
       general_feedback_category: [
         "feedback",
         "concern",
         "suggestion",
         "review",
       ],
-      outbound_event_status: ["pending", "sent", "failed"],
-      payment_status: [
-        "pending",
-        "initiated",
-        "succeeded",
-        "failed",
-        "refunded",
-        "cancelled",
-      ],
-      payout_status: ["pending", "paid", "failed", "cancelled"],
-      refund_status: ["pending", "succeeded", "failed", "cancelled"],
-      registration_status: [
-        "registered",
-        "confirmed",
-        "cancelled",
-        "checked_in",
-        "no_show",
-        "waitlisted",
-        "refunded",
-      ],
       session_status: ["booked", "completed", "cancelled", "no_show"],
-      ticket_type: ["free", "paid", "donation"],
     },
   },
 } as const
