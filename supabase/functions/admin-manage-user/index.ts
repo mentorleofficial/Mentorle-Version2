@@ -177,6 +177,13 @@ Deno.serve(async (req) => {
         userId = linkData.user?.id ?? null;
         const actionLink = linkData.properties.action_link;
 
+        // handle_new_user only trusts a role from app_metadata (service-role only); invite links can only set
+        // user_metadata, so stamp the role here, before the invitee confirms and the trigger runs.
+        if (userId) {
+          const { error: metaErr } = await admin.auth.admin.updateUserById(userId, { app_metadata: { role } });
+          if (metaErr) return json({ error: `Failed to set role: ${metaErr.message}` }, 500);
+        }
+
         const BREVO = Deno.env.get("BREVO_API_KEY");
         if (!BREVO) {
           return json({ error: "BREVO_API_KEY not configured" }, 500);
@@ -229,6 +236,9 @@ Deno.serve(async (req) => {
           password,
           email_confirm: true,
           user_metadata: { full_name, role },
+          // handle_new_user only trusts a role from app_metadata (settable by the service role alone);
+          // user_metadata roles other than mentee/mentor are ignored so browsers can't self-assign admin.
+          app_metadata: { role },
         });
         if (error) return json({ error: error.message }, 400);
         userId = data.user?.id ?? null;

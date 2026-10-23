@@ -143,6 +143,8 @@ Deno.serve(async (req) => {
         email,
         email_confirm: true,
         user_metadata: { full_name: fullName || email.split("@")[0], role },
+        // handle_new_user only trusts the role from app_metadata (settable by the service role alone).
+        app_metadata: { role },
       });
       if (createErr || !created.user) {
         await logAudit(admin, null, "jwt_login_failure", { reason: "create_user_failed", message: createErr?.message });
