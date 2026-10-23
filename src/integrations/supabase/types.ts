@@ -257,6 +257,35 @@ export type Database = {
         }
         Relationships: []
       }
+      event_meeting_links: {
+        Row: {
+          event_id: string
+          meeting_link: string | null
+          session_links: Json
+          updated_at: string
+        }
+        Insert: {
+          event_id: string
+          meeting_link?: string | null
+          session_links?: Json
+          updated_at?: string
+        }
+        Update: {
+          event_id?: string
+          meeting_link?: string | null
+          session_links?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_meeting_links_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events_programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_participants: {
         Row: {
           completion_status: string | null
@@ -2061,6 +2090,14 @@ export type Database = {
           duration_minutes: number
           id: string
           scheduled_at: string
+        }[]
+      }
+      get_event_meeting_links: {
+        Args: { _event_ids: string[] }
+        Returns: {
+          event_id: string
+          meeting_link: string
+          session_links: Json
         }[]
       }
       get_event_participants: {
