@@ -388,6 +388,35 @@ export type Database = {
         }
         Relationships: []
       }
+      featured_mentors: {
+        Row: {
+          mentor_id: string
+          position: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          mentor_id: string
+          position: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          mentor_id?: string
+          position?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "featured_mentors_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: true
+            referencedRelation: "mentor_profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       feedback: {
         Row: {
           audience: Database["public"]["Enums"]["feedback_audience"]
@@ -2168,12 +2197,31 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      list_featured_mentors: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          bio: string
+          current_organization: string
+          current_role: string
+          domain: string
+          expertise: string[]
+          full_name: string
+          headline: string
+          position: number
+          slug: string
+          user_id: string
+          years_experience: number
+        }[]
+      }
       list_public_mentors: {
         Args: never
         Returns: {
           avatar_url: string
           bio: string
+          current_organization: string
           current_role: string
+          domain: string
           expertise: string[]
           full_name: string
           headline: string
@@ -2233,6 +2281,10 @@ export type Database = {
           _ttl_minutes: number
         }
         Returns: string
+      }
+      set_featured_mentors: {
+        Args: { _mentor_ids: string[] }
+        Returns: undefined
       }
     }
     Enums: {

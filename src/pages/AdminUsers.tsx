@@ -1,6 +1,7 @@
 import { formatISTDate } from "@/lib/datetime";
 import { useEffect, useState } from "react";
 import AppLayout from "@/components/AppLayout";
+import FeaturedMentorsSettings from "@/components/admin/FeaturedMentorsSettings";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -230,6 +231,8 @@ const AdminUsers = () => {
             </DialogContent>
           </Dialog>
         </div>
+
+        <FeaturedMentorsSettings />
 
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1 max-w-sm">
