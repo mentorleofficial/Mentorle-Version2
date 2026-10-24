@@ -330,7 +330,7 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
     }
 
     try {
-      const { meetingUrl } = await bookMutation.mutateAsync({
+      const { sessionId, meetingUrl } = await bookMutation.mutateAsync({
         mentorId,
         menteeId: user.id,
         scheduledAt,
@@ -343,29 +343,18 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
         programId: selectedProgramId,
       });
 
-      if (mentor?.email && user.email) {
-        supabase.functions.invoke("send-booking-email", {
-          body: {
-            mentorEmail: mentor.email,
-            mentorName: mentor.full_name || "your mentor",
-            menteeEmail: user.email,
-            menteeName: (user.user_metadata as Record<string, unknown>)?.full_name || user.email,
-            scheduledAtISO: scheduledAt.toISOString(),
-            durationMinutes: duration,
-            meetingUrl,
-            menteeNotes: notes || undefined,
-          },
-        }).catch(() => {});
-      }
+      // The function looks up both people itself and sends once per session.
+      supabase.functions.invoke("send-booking-email", { body: { sessionId } }).catch(() => {});
 
       toast({ title: "Session booked!", description: `Scheduled for ${formatISTDateTime(scheduledAt)}` });
       setBookedSession({ scheduledAt, meetingUrl });
     } catch (e) {
       const err = e as { message?: string; code?: string };
+      // book_session() raises readable messages (rescheduling closed, finish your profile…); slot clashes too.
       const friendly =
         err?.message?.includes("already been rescheduled")
           ? "This session has already been rescheduled once."
-          : err?.message?.includes("overlap") || err?.code === "23P01" || err?.code === "23505"
+          : err?.message?.includes("overlap") || err?.code === "23505"
           ? "That slot was just taken — please pick another."
           : err?.message ?? "Booking failed";
       toast({ variant: "destructive", title: "Booking failed", description: friendly });

@@ -1,6 +1,14 @@
 // Send booking confirmation emails via Brevo (transactional email API).
 // Triggered from BookSession.tsx after a successful booking.
 
+// Booking confirmation emails (mentee + mentor) for one session.
+//
+// Called by the booking screens right after book_session() with { sessionId }. It used to accept the email
+// addresses, names and meeting link from the caller with no login, so anyone could send Mentorle-branded mail to
+// any address; now it requires a signed-in caller who is the session's mentee or mentor (or an admin), looks
+// everything up itself, and sends at most once per session (sessions.booking_email_sent_at).
+import { createClient } from "npm:@supabase/supabase-js@2.57.0";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -16,6 +24,11 @@ interface Recipient {
 }
 
 interface Payload {
+  sessionId: string;
+}
+
+// What the emails need, loaded on the server.
+interface BookingDetails {
   mentorEmail: string;
   mentorName: string;
   menteeEmail: string;
@@ -180,30 +193,69 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const json = (payload: unknown, status = 200) =>
+      new Response(JSON.stringify(payload), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) return json({ error: "Not signed in" }, 401);
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    const callerId = userData?.user?.id;
+    if (userErr || !callerId) return json({ error: "Not signed in" }, 401);
+
+    const { sessionId } = (await req.json().catch(() => ({}))) as Partial<Payload>;
+    if (!sessionId || typeof sessionId !== "string") return json({ error: "Missing sessionId" }, 400);
+
+    const admin = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: session } = await admin
+      .from("sessions")
+      .select("id, mentor_id, mentee_id, scheduled_at, duration_minutes, meeting_url, mentee_notes, status")
+      .eq("id", sessionId)
+      .maybeSingle();
+    if (!session) return json({ error: "Session not found" }, 404);
+    const { data: isAdmin } = await admin.rpc("has_role", { _user_id: callerId, _role: "admin" });
+    if (callerId !== session.mentee_id && callerId !== session.mentor_id && !isAdmin) {
+      return json({ error: "Session not found" }, 404);
+    }
+    if (session.status !== "booked") return json({ ok: true, skipped: "not booked" });
+
+    // Once per session: claim it before sending.
+    const { data: claimed } = await admin
+      .from("sessions")
+      .update({ booking_email_sent_at: new Date().toISOString() })
+      .eq("id", session.id)
+      .is("booking_email_sent_at", null)
+      .select("id");
+    if (!claimed?.length) return json({ ok: true, skipped: "already sent" });
+
+    const { data: people } = await admin.from("users").select("id, email, full_name").in("id", [session.mentor_id, session.mentee_id]);
+    const mentorRow = people?.find((u) => u.id === session.mentor_id);
+    const menteeRow = people?.find((u) => u.id === session.mentee_id);
+    if (!mentorRow?.email || !menteeRow?.email) return json({ ok: false, error: "Missing email address" }, 200);
+
     const rawKey = Deno.env.get("BREVO_API_KEY");
     if (!rawKey) {
-      return new Response(JSON.stringify({ error: "BREVO_API_KEY not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // Let a later call retry once the key exists.
+      await admin.from("sessions").update({ booking_email_sent_at: null }).eq("id", session.id);
+      return json({ error: "BREVO_API_KEY not configured" }, 500);
     }
     const apiKey = rawKey.trim();
-    console.log("BREVO_API_KEY debug:", {
-      length: apiKey.length,
-      prefix: apiKey.slice(0, 9),
-      startsWithXkeysib: apiKey.startsWith("xkeysib-"),
-    });
 
-    const body = (await req.json()) as Payload;
-    const required: (keyof Payload)[] = ["mentorEmail", "mentorName", "menteeEmail", "menteeName", "scheduledAtISO", "durationMinutes", "meetingUrl"];
-    for (const k of required) {
-      if (body[k] === undefined || body[k] === null || body[k] === "") {
-        return new Response(JSON.stringify({ error: `Missing field: ${k}` }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
+    const body: BookingDetails = {
+      mentorEmail: mentorRow.email,
+      mentorName: mentorRow.full_name || "your mentor",
+      menteeEmail: menteeRow.email,
+      menteeName: menteeRow.full_name || menteeRow.email,
+      scheduledAtISO: session.scheduled_at,
+      durationMinutes: session.duration_minutes,
+      meetingUrl: session.meeting_url,
+      menteeNotes: session.mentee_notes || undefined,
+    };
 
     const whenLabel = formatDateTime(body.scheduledAtISO);
 
@@ -264,6 +316,10 @@ Deno.serve(async (req) => {
       r.status === "rejected" ? [{ to: i === 0 ? "mentee" : "mentor", error: String(r.reason) }] : []
     );
     if (errors.length) console.error("Brevo send errors:", errors);
+    // Nothing went out (e.g. Brevo down): release the claim so a later call can retry.
+    if (errors.length === results.length) {
+      await admin.from("sessions").update({ booking_email_sent_at: null }).eq("id", session.id);
+    }
 
     return new Response(JSON.stringify({ ok: errors.length === 0, errors }), {
       status: 200,

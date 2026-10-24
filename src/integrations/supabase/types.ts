@@ -1158,6 +1158,10 @@ export type Database = {
           updated_at: string
           user_id: string
           years_experience: number | null
+          allow_reschedule: boolean
+          cancellation_notice_hours: number
+          default_meeting_url: string | null
+          reschedule_notice_hours: number
         }
         Insert: {
           allow_mentee_attachments?: boolean
@@ -1186,6 +1190,10 @@ export type Database = {
           updated_at?: string
           user_id: string
           years_experience?: number | null
+          allow_reschedule?: boolean
+          cancellation_notice_hours?: number
+          default_meeting_url?: string | null
+          reschedule_notice_hours?: number
         }
         Update: {
           allow_mentee_attachments?: boolean
@@ -1214,6 +1222,10 @@ export type Database = {
           updated_at?: string
           user_id?: string
           years_experience?: number | null
+          allow_reschedule?: boolean
+          cancellation_notice_hours?: number
+          default_meeting_url?: string | null
+          reschedule_notice_hours?: number
         }
         Relationships: [
           {
@@ -1738,6 +1750,7 @@ export type Database = {
           status: Database["public"]["Enums"]["session_status"]
           title: string
           topic: string
+          booking_email_sent_at: string | null
         }
         Insert: {
           cancellation_reason?: string
@@ -1759,6 +1772,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["session_status"]
           title?: string
           topic?: string
+          booking_email_sent_at?: string | null
         }
         Update: {
           cancellation_reason?: string
@@ -1780,6 +1794,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["session_status"]
           title?: string
           topic?: string
+          booking_email_sent_at?: string | null
         }
         Relationships: [
           {
@@ -2074,11 +2089,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      book_session: {
+        Args: {
+          _notes?: string
+          _offering_id: string
+          _program_id?: string
+          _reschedule_from?: string
+          _scheduled_at: string
+        }
+        Returns: { meeting_url: string; session_id: string }[]
+      }
       can_mentee_book_mentor: {
         Args: { _mentee: string; _mentor: string }
         Returns: boolean
       }
       check_email_exists: { Args: { email_to_check: string }; Returns: boolean }
+      cancel_session: {
+        Args: { _reason?: string; _session_id: string }
+        Returns: undefined
+      }
       consume_plus_session: {
         Args: {
           _kind: string
@@ -2155,12 +2184,12 @@ export type Database = {
       get_mentor_booking_info: {
         Args: { _mentor_id: string }
         Returns: {
+          allow_reschedule: boolean
           avatar_url: string
           bio: string
-          buffer_time_minutes: number
+          cancellation_notice_hours: number
           current_organization: string
           current_role: string
-          email: string
           expertise: string[]
           full_name: string
           headline: string
@@ -2168,7 +2197,9 @@ export type Database = {
           is_active: boolean
           linkedin_url: string
           minimum_notice_hours: number
+          reschedule_notice_hours: number
           timezone: string
+          buffer_time_minutes: number
           years_experience: number
         }[]
       }
@@ -2293,6 +2324,23 @@ export type Database = {
         }[]
       }
       mentee_is_plus_member: { Args: { p_mentee_id: string }; Returns: boolean }
+      mentor_allows_mentee_attachments: {
+        Args: { _mentor_id: string }
+        Returns: boolean
+      }
+      mentor_booking_rules: {
+        Args: { _mentor_id: string }
+        Returns: {
+          allow_reschedule: boolean
+          cancellation_notice_hours: number
+          minimum_notice_hours: number
+          reschedule_notice_hours: number
+        }[]
+      }
+      mentor_open_slots: {
+        Args: { _days?: number; _from?: string; _ignore_session_id?: string; _offering_id: string }
+        Returns: { starts_at: string }[]
+      }
       plus_quota_status: {
         Args: never
         Returns: {

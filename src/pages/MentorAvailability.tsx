@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -10,6 +10,8 @@ import { DayRow } from "@/features/availability/components/DayRow";
 import { OverrideList } from "@/features/availability/components/OverrideList";
 import { AvailabilityPreview } from "@/features/availability/components/AvailabilityPreview";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -45,6 +47,22 @@ const MentorAvailability = () => {
 
   const bufferTime = data?.buffer_time_minutes ?? 0;
   const minNotice = data?.minimum_notice_hours ?? 0;
+  const cancelCutoff = data?.cancellation_notice_hours ?? 0;
+  const allowReschedule = data?.allow_reschedule ?? true;
+  const rescheduleCutoff = data?.reschedule_notice_hours ?? 0;
+
+  // Own meeting link: typed freely, saved on blur (empty = an automatic Jitsi room per session).
+  const [meetingLink, setMeetingLink] = useState("");
+  useEffect(() => setMeetingLink(data?.default_meeting_url ?? ""), [data?.default_meeting_url]);
+  const saveMeetingLink = () => {
+    const value = meetingLink.trim();
+    if ((value || null) === (data?.default_meeting_url ?? null)) return;
+    if (value && !/^https:\/\/\S+$/i.test(value)) {
+      toast({ variant: "destructive", title: "Check the meeting link", description: "Use a full https:// link, e.g. https://meet.google.com/abc-defg-hij" });
+      return;
+    }
+    m.updateSettings.mutate({ default_meeting_url: value || null }, { onError: handleError });
+  };
 
   const showSaving = anyPending || (isFetching && !isLoading);
   const showSaved = !anyPending && !isFetching && !isLoading;
@@ -149,7 +167,7 @@ const MentorAvailability = () => {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-bold">Booking Settings</CardTitle>
                 <CardDescription>
-                  Configure buffers and booking notice requirements.
+                  Buffers, booking notice, and when mentees can cancel or reschedule.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-6 sm:grid-cols-2">
@@ -202,6 +220,78 @@ const MentorAvailability = () => {
                       <SelectItem value="48">48 hours (2 days)</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="cancel-cutoff" className="font-semibold text-sm">Mentees can cancel</Label>
+                  <Select
+                    value={String(cancelCutoff)}
+                    onValueChange={(val) =>
+                      m.updateSettings.mutate({ cancellation_notice_hours: Number(val) }, { onError: handleError })
+                    }
+                  >
+                    <SelectTrigger id="cancel-cutoff">
+                      <SelectValue placeholder="Select cancellation window" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Any time before it starts</SelectItem>
+                      <SelectItem value="1">Up to 1 hour before</SelectItem>
+                      <SelectItem value="2">Up to 2 hours before</SelectItem>
+                      <SelectItem value="4">Up to 4 hours before</SelectItem>
+                      <SelectItem value="12">Up to 12 hours before</SelectItem>
+                      <SelectItem value="24">Up to 24 hours before</SelectItem>
+                      <SelectItem value="48">Up to 48 hours before</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <Label htmlFor="reschedule-cutoff" className="font-semibold text-sm">Mentees can reschedule</Label>
+                    <Switch
+                      checked={allowReschedule}
+                      aria-label="Allow rescheduling"
+                      onCheckedChange={(checked) => m.updateSettings.mutate({ allow_reschedule: checked }, { onError: handleError })}
+                    />
+                  </div>
+                  <Select
+                    value={String(rescheduleCutoff)}
+                    disabled={!allowReschedule}
+                    onValueChange={(val) =>
+                      m.updateSettings.mutate({ reschedule_notice_hours: Number(val) }, { onError: handleError })
+                    }
+                  >
+                    <SelectTrigger id="reschedule-cutoff">
+                      <SelectValue placeholder={allowReschedule ? "Select reschedule window" : "Rescheduling is off"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Any time before it starts</SelectItem>
+                      <SelectItem value="1">Up to 1 hour before</SelectItem>
+                      <SelectItem value="2">Up to 2 hours before</SelectItem>
+                      <SelectItem value="4">Up to 4 hours before</SelectItem>
+                      <SelectItem value="12">Up to 12 hours before</SelectItem>
+                      <SelectItem value="24">Up to 24 hours before</SelectItem>
+                      <SelectItem value="48">Up to 48 hours before</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Each booking can be rescheduled once.</p>
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="meeting-link" className="font-semibold text-sm">Meeting link</Label>
+                  <Input
+                    id="meeting-link"
+                    type="url"
+                    inputMode="url"
+                    placeholder="Leave empty for an automatic Jitsi link per session"
+                    value={meetingLink}
+                    onChange={(e) => setMeetingLink(e.target.value)}
+                    onBlur={saveMeetingLink}
+                    onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Your own room (Google Meet, Zoom…) for every new booking. Only you and the mentee you're meeting see it.
+                  </p>
                 </div>
               </CardContent>
             </Card>

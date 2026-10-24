@@ -99,15 +99,11 @@ export function useCancelMenteeSession(userId?: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { id: string; reason?: string }) => {
-      const { error } = await supabase
-        .from("sessions")
-        .update({
-          status: "cancelled",
-          cancelled_by: userId,
-          cancelled_at: new Date().toISOString(),
-          cancellation_reason: input.reason || "Cancelled by mentee",
-        } as never)
-        .eq("id", input.id);
+      // cancel_session() applies the mentor's cancellation cutoff (mentees can't update sessions directly).
+      const { error } = await supabase.rpc("cancel_session", {
+        _session_id: input.id,
+        _reason: input.reason || "Cancelled by mentee",
+      });
       if (error) throw error;
       return input;
     },

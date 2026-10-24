@@ -6,7 +6,6 @@ export interface BookingMentor {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
-  email: string | null;
   headline: string | null;
   current_role: string | null;
   current_organization: string | null;
@@ -33,6 +32,9 @@ export interface BookingMentorProfile {
   timezone: string;
   buffer_time_minutes: number;
   minimum_notice_hours: number;
+  cancellation_notice_hours: number;
+  allow_reschedule: boolean;
+  reschedule_notice_hours: number;
 }
 export interface BookingOffering {
   id: string;
@@ -100,7 +102,6 @@ export function useBookSessionStatic(mentorId?: string) {
             id: info.id,
             full_name: info.full_name,
             avatar_url: info.avatar_url,
-            email: info.email,
             headline: (info as any).headline ?? null,
             current_role: (info as any).current_role ?? null,
             current_organization: (info as any).current_organization ?? null,
@@ -116,6 +117,9 @@ export function useBookSessionStatic(mentorId?: string) {
             timezone: info.timezone,
             buffer_time_minutes: info.buffer_time_minutes,
             minimum_notice_hours: info.minimum_notice_hours,
+            cancellation_notice_hours: info.cancellation_notice_hours ?? 0,
+            allow_reschedule: info.allow_reschedule ?? true,
+            reschedule_notice_hours: info.reschedule_notice_hours ?? 0,
           }
           : null,
         slots: (slotsRes.data as BookingSlot[] | null) ?? [],
@@ -180,44 +184,21 @@ export interface BookSessionResult {
 export function useBookSession() {
   const qc = useQueryClient();
   return useMutation<BookSessionResult, Error, BookSessionInput>({
+    // book_session() checks the offering (free unless rescheduling), the time (an open slot), onboarding and
+    // the mentor's reschedule rules, and sets the length, title and meeting link (the mentor's own or Jitsi).
+    // It also cancels the original when rescheduling. Mentees can't insert sessions directly.
     mutationFn: async (input) => {
-      const meetingId =
-        globalThis.crypto?.randomUUID?.() ??
-        `${Date.now()}-${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
-      const meetingUrl = `https://meet.jit.si/mentorle-${meetingId}`;
-
-      const { data: inserted, error } = await supabase
-        .from("sessions")
-        .insert({
-          mentor_id: input.mentorId,
-          mentee_id: input.menteeId,
-          scheduled_at: input.scheduledAt.toISOString(),
-          duration_minutes: input.durationMinutes,
-          mentee_notes: input.notes,
-          title: input.title,
-          topic: input.topic ?? "",
-          meeting_url: meetingUrl,
-          offering_id: input.offeringId || null,
-          program_id: input.programId || null,
-          rescheduled_from_id: input.rescheduleId || null,
-        })
-        .select("id")
-        .single();
-      if (error || !inserted) throw error || new Error("Insert failed");
-
-      if (input.rescheduleId) {
-        await supabase
-          .from("sessions")
-          .update({
-            status: "cancelled",
-            cancelled_by: input.menteeId,
-            cancelled_at: new Date().toISOString(),
-            cancellation_reason: "Rescheduled",
-          })
-          .eq("id", input.rescheduleId);
-      }
-
-      return { sessionId: inserted.id, meetingUrl };
+      if (!input.offeringId) throw new Error("Choose a session type to book");
+      const { data, error } = await supabase.rpc("book_session", {
+        _offering_id: input.offeringId,
+        _scheduled_at: input.scheduledAt.toISOString(),
+        _notes: input.notes ?? "",
+        _program_id: input.programId ?? null,
+        _reschedule_from: input.rescheduleId ?? null,
+      });
+      const row = Array.isArray(data) ? data[0] : null;
+      if (error || !row) throw error || new Error("Booking failed");
+      return { sessionId: row.session_id, meetingUrl: row.meeting_url };
     },
     onSuccess: (_res, vars) => {
       qc.invalidateQueries({ queryKey: bookSessionBookedKey(vars.mentorId, vars.rescheduleId) });

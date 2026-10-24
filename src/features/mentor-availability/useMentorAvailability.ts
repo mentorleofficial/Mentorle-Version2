@@ -28,6 +28,10 @@ export interface MentorAvailabilityData {
   timezone: string;
   buffer_time_minutes: number;
   minimum_notice_hours: number;
+  cancellation_notice_hours: number;
+  allow_reschedule: boolean;
+  reschedule_notice_hours: number;
+  default_meeting_url: string | null;
   events: CalendarEvent[];
 }
 
@@ -49,6 +53,10 @@ export function useMentorAvailability(userId?: string) {
         timezone: settings.timezone,
         buffer_time_minutes: settings.buffer_time_minutes,
         minimum_notice_hours: settings.minimum_notice_hours,
+        cancellation_notice_hours: settings.cancellation_notice_hours,
+        allow_reschedule: settings.allow_reschedule,
+        reschedule_notice_hours: settings.reschedule_notice_hours,
+        default_meeting_url: settings.default_meeting_url,
         events,
       };
     },
@@ -91,7 +99,7 @@ export function useAvailabilityMutations(userId?: string) {
       onSuccess: invalidate,
     }),
     updateSettings: useMutation({
-      mutationFn: (patch: { timezone?: string; buffer_time_minutes?: number; minimum_notice_hours?: number }) =>
+      mutationFn: (patch: Parameters<typeof updateAvailabilitySettings>[1]) =>
         updateAvailabilitySettings(userId!, patch),
       onSuccess: invalidate,
     }),
