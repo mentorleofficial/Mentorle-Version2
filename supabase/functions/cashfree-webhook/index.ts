@@ -1,7 +1,8 @@
-// Cashfree -> us. The ONLY writer of paid status, session creation on payment, and
-// membership activation. Authenticated by HMAC-SHA256 signature (not a user JWT), so
-// config.toml sets verify_jwt = false. Idempotent: a duplicate PAYMENT_SUCCESS is a no-op.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.0";
+// Cashfree -> us. Marks payments paid or failed and delivers what was bought (through the shared settle code,
+// which cashfree-verify-order uses too), and keeps legacy Plus subscriptions in step. Authenticated by
+// HMAC-SHA256 signature (not a user JWT), so config.toml sets verify_jwt = false. Idempotent.
+import { createClient } from "npm:@supabase/supabase-js@2.57.0";
+import { paymentByOrder, settleFailed, settlePaid } from "../_shared/payments.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -47,84 +48,12 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
-    if (type === "PAYMENT_SUCCESS_WEBHOOK") {
+    if (type === "PAYMENT_SUCCESS_WEBHOOK" || type === "PAYMENT_FAILED_WEBHOOK" || type === "PAYMENT_USER_DROPPED_WEBHOOK") {
       const orderId = event?.data?.order?.order_id ?? null;
-      if (!orderId) return reply({ received: true });
-
-      const { data: pay } = await admin.from("payments").select("*").eq("cashfree_order_id", orderId).maybeSingle();
-      if (!pay || pay.status === "paid") return reply({ received: true }); // unknown or already handled
-
-      await admin.from("payments")
-        .update({ status: "paid", payload: event, updated_at: new Date().toISOString() })
-        .eq("id", pay.id);
-
-      await admin.from("slot_holds").delete().eq("payment_id", pay.id); // release the hold
-
-      if (pay.kind === "session" && pay.payload?.booking) {
-        const b = pay.payload.booking;
-        const meetingId = crypto.randomUUID();
-        const { data: sess } = await admin.from("sessions").insert({
-          mentor_id: b.mentor_id,
-          mentee_id: b.mentee_id,
-          scheduled_at: b.scheduled_at,
-          duration_minutes: b.duration_minutes,
-          mentee_notes: b.notes ?? "",
-          title: b.title ?? "Session",
-          topic: b.topic ?? "",
-          meeting_url: `https://meet.jit.si/mentorle-${meetingId}`,
-          offering_id: b.offering_id ?? null,
-        }).select("id").single();
-
-        if (sess) {
-          await admin.from("payments").update({ session_id: sess.id }).eq("id", pay.id);
-
-          const { data: settings } = await admin.from("payment_settings").select("commission_percent").limit(1).maybeSingle();
-          const commission = Number(settings?.commission_percent ?? 0);
-          const gross = Number(pay.payload?.original_amount ?? pay.amount); // mentor earns on the pre-discount price
-          const fee = Math.round(gross * commission) / 100;
-          await admin.from("mentor_earnings").insert({
-            mentor_id: b.mentor_id,
-            source: "paid_session",
-            reference_id: sess.id,
-            gross_amount: gross,
-            fee_amount: fee,
-            net_amount: gross - fee,
-          });
-        }
-      }
-
-      if (pay.kind === "event" && pay.payload?.event) {
-        const ev = pay.payload.event;
-        const { data: reg } = await admin.from("event_participants")
-          .insert({ event_id: ev.event_id, user_id: ev.user_id, registered_at: new Date().toISOString() })
-          .select("id").single();
-        const { data: settings } = await admin.from("payment_settings").select("commission_percent").limit(1).maybeSingle();
-        const commission = Number(settings?.commission_percent ?? 0);
-        const gross = Number(pay.payload?.original_amount ?? pay.amount); // mentor earns on the pre-discount price
-        const fee = Math.round(gross * commission) / 100;
-        await admin.from("mentor_earnings").insert({
-          mentor_id: ev.mentor_id,
-          source: "paid_event",
-          reference_id: reg?.id ?? ev.event_id,
-          gross_amount: gross,
-          fee_amount: fee,
-          net_amount: gross - fee,
-        });
-      }
-      return reply({ received: true });
-    }
-
-    if (type === "PAYMENT_FAILED_WEBHOOK" || type === "PAYMENT_USER_DROPPED_WEBHOOK") {
-      const orderId = event?.data?.order?.order_id ?? null;
-      if (orderId) {
-        const { data: failedPay } = await admin.from("payments")
-          .select("id").eq("cashfree_order_id", orderId).maybeSingle();
-        await admin.from("payments")
-          .update({ status: "failed", payload: event, updated_at: new Date().toISOString() })
-          .eq("cashfree_order_id", orderId)
-          .neq("status", "paid"); // never clobber an already-confirmed payment
-        if (failedPay) await admin.from("slot_holds").delete().eq("payment_id", failedPay.id);
-      }
+      const payment = orderId ? await paymentByOrder(admin, orderId) : null;
+      if (!payment) return reply({ received: true }); // not one of ours
+      if (type === "PAYMENT_SUCCESS_WEBHOOK") await settlePaid(admin, payment, event);
+      else await settleFailed(admin, payment, event);
       return reply({ received: true });
     }
 

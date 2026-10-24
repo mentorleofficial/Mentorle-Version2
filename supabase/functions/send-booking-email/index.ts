@@ -4,6 +4,7 @@
 // session's mentee or mentor (or an admin); sent at most once per session (sessions.booking_email_sent_at).
 // { sessionId, kind: "rescheduled" }: "your session has moved", called after reschedule_session() by the mentor
 // or an admin; sent once per move (sessions.reschedule_email_pending).
+// The payment functions call it as the system (service role) once a paid session is booked.
 // Everything is looked up on the server; the caller only names the session.
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 
@@ -201,12 +202,16 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return json({ error: "Not signed in" }, 401);
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
-    const callerId = userData?.user?.id;
-    if (userErr || !callerId) return json({ error: "Not signed in" }, 401);
+    const isSystem = authHeader === `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`;
+    let callerId: string | null = null;
+    if (!isSystem) {
+      const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: userData, error: userErr } = await userClient.auth.getUser();
+      callerId = userData?.user?.id ?? null;
+      if (userErr || !callerId) return json({ error: "Not signed in" }, 401);
+    }
 
     const { sessionId, kind = "booked" } = (await req.json().catch(() => ({}))) as Partial<Payload>;
     if (!sessionId || typeof sessionId !== "string") return json({ error: "Missing sessionId" }, 400);
@@ -222,7 +227,7 @@ Deno.serve(async (req) => {
       .eq("id", sessionId)
       .maybeSingle();
     if (!session) return json({ error: "Session not found" }, 404);
-    const { data: isAdmin } = await admin.rpc("has_role", { _user_id: callerId, _role: "admin" });
+    const { data: isAdmin } = isSystem ? { data: true } : await admin.rpc("has_role", { _user_id: callerId, _role: "admin" });
     if (callerId !== session.mentee_id && callerId !== session.mentor_id && !isAdmin) {
       return json({ error: "Session not found" }, 404);
     }

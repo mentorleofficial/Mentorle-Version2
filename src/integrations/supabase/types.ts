@@ -1904,6 +1904,19 @@ export type Database = {
           price: number
           slug: string
           updated_at: string
+          access_months: number | null
+          badge: string
+          billing: string
+          cta_label: string
+          event_discount_percent: number
+          featured: boolean
+          free_sessions: number
+          free_sessions_period: string
+          intro: string
+          price_note: string
+          session_discount_percent: number
+          sort_order: number
+          tagline: string
         }
         Insert: {
           benefits?: Json
@@ -1919,6 +1932,19 @@ export type Database = {
           price?: number
           slug: string
           updated_at?: string
+          access_months?: number | null
+          badge?: string
+          billing?: string
+          cta_label?: string
+          event_discount_percent?: number
+          featured?: boolean
+          free_sessions?: number
+          free_sessions_period?: string
+          intro?: string
+          price_note?: string
+          session_discount_percent?: number
+          sort_order?: number
+          tagline?: string
         }
         Update: {
           benefits?: Json
@@ -1934,6 +1960,19 @@ export type Database = {
           price?: number
           slug?: string
           updated_at?: string
+          access_months?: number | null
+          badge?: string
+          billing?: string
+          cta_label?: string
+          event_discount_percent?: number
+          featured?: boolean
+          free_sessions?: number
+          free_sessions_period?: string
+          intro?: string
+          price_note?: string
+          session_discount_percent?: number
+          sort_order?: number
+          tagline?: string
         }
         Relationships: []
       }
@@ -2343,11 +2382,20 @@ export type Database = {
         Args: never
         Returns: {
           discount_percent: number
+          event_discount_percent: number
           has_membership: boolean
+          period_end: string | null
+          plan_name: string | null
+          plan_slug: string | null
+          quota_period: string | null
           quota_remaining: number
           quota_total: number
           quota_used: number
         }[]
+      }
+      book_plus_session: {
+        Args: { _notes?: string; _offering_id: string; _program_id?: string | null; _scheduled_at: string }
+        Returns: { meeting_url: string; session_id: string }[]
       }
       plus_quota_window_start: {
         Args: { _anchor_day: number; _today: string }

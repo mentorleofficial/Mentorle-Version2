@@ -52,3 +52,7 @@ verify_jwt = false
 # Cashfree -> us: no user JWT; authenticated by HMAC signature inside the function.
 [functions.cashfree-webhook]
 verify_jwt = false
+
+# The buyer checks their own order (Cashfree return page); verifies the JWT inside.
+[functions.cashfree-verify-order]
+verify_jwt = false

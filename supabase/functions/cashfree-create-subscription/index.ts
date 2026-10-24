@@ -54,10 +54,12 @@ Deno.serve(async (req) => {
 
     const { data: plan } = await admin
       .from("subscription_plans")
-      .select("id, name, interval, price, currency, max_amount, is_active")
+      .select("id, name, interval, price, currency, max_amount, is_active, billing")
       .eq("id", body.plan_id)
       .maybeSingle();
     if (!plan || !plan.is_active) return json({ error: "Plan not found or inactive" }, 404);
+    // One-time passes (Pro Pass…) are bought with a normal order on mentorle.in, not a mandate.
+    if (plan.billing !== "subscription") return json({ error: "This plan is bought as a one-time pass on mentorle.in" }, 400);
 
     // Block only on a real (active/past_due) membership — no stacking.
     const { data: active } = await admin
