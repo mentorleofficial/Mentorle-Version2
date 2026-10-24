@@ -91,12 +91,13 @@ export interface AvailabilitySettings {
   timezone: string;
   buffer_time_minutes: number;
   minimum_notice_hours: number;
+  default_meeting_url: string | null;
 }
 
 export async function fetchAvailabilitySettings(mentorId: string): Promise<AvailabilitySettings> {
   const { data, error } = await supabase
     .from("mentor_profiles")
-    .select("timezone, buffer_time_minutes, minimum_notice_hours")
+    .select("timezone, buffer_time_minutes, minimum_notice_hours, default_meeting_url")
     .eq("user_id", mentorId)
     .maybeSingle();
   if (error) throw error;
@@ -104,6 +105,7 @@ export async function fetchAvailabilitySettings(mentorId: string): Promise<Avail
     timezone: data?.timezone ?? "Asia/Kolkata",
     buffer_time_minutes: data?.buffer_time_minutes ?? 0,
     minimum_notice_hours: data?.minimum_notice_hours ?? 0,
+    default_meeting_url: data?.default_meeting_url ?? null,
   };
 }
 
@@ -114,7 +116,7 @@ export async function fetchTimezone(mentorId: string): Promise<string> {
 
 export async function updateAvailabilitySettings(
   mentorId: string,
-  patch: { timezone?: string; buffer_time_minutes?: number; minimum_notice_hours?: number }
+  patch: Partial<Omit<AvailabilitySettings, "timezone">> & { timezone?: string }
 ) {
   const { error } = await supabase
     .from("mentor_profiles")

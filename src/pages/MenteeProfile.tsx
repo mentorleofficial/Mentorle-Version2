@@ -40,6 +40,7 @@ import {
 import { cn } from "@/lib/utils";
 import { PhoneInput } from "@/components/ui/phone-input";
 import ResumeUploadCard from "@/components/profile/ResumeUploadCard";
+import { openMenteeResume } from "@/lib/menteeResume";
 import { useBranding } from "@/contexts/BrandingContext";
 import { useStickyActionBar } from "@/contexts/StickyActionBarContext";
 
@@ -107,6 +108,7 @@ const MenteeProfile = () => {
   const [saved, setSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadingResume, setUploadingResume] = useState(false);
+  const [viewingResume, setViewingResume] = useState(false);
   const [nameTouched, setNameTouched] = useState(false);
 
   // Original fields
@@ -1068,7 +1070,14 @@ const MenteeProfile = () => {
             {/* Resume */}
             <ResumeUploadCard
               hasResume={!!resumeUrl}
-              viewHref={resumeUrl}
+              onView={() => {
+                if (!resumeUrl) return;
+                setViewingResume(true);
+                openMenteeResume(resumeUrl)
+                  .catch((e: any) => toast({ variant: "destructive", title: "Couldn't open resume", description: e?.message }))
+                  .finally(() => setViewingResume(false));
+              }}
+              viewing={viewingResume}
               uploading={uploadingResume}
               onSelectFile={handleResumeUpload}
               onRemove={handleRemoveResume}

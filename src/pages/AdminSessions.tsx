@@ -21,6 +21,7 @@ import {
   Calendar, Clock, CheckCircle2, XCircle, UserX, Star, Download, MoreHorizontal, Search,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import RescheduleSessionDialog, { type RescheduleTarget } from "@/components/sessions/RescheduleSessionDialog";
 import { useAdminSessions, useAdminSessionStats, type AdminSessionFilters, type AdminSessionRow } from "@/features/admin/hooks/useAdminSessions";
 import { useQuery } from "@tanstack/react-query";
 import type { Database } from "@/integrations/supabase/types";
@@ -57,6 +58,7 @@ const AdminSessions = () => {
   const [programId, setProgramId] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [detail, setDetail] = useState<AdminSessionRow | null>(null);
+  const [rescheduling, setRescheduling] = useState<RescheduleTarget | null>(null);
 
   const filters: AdminSessionFilters = useMemo(() => ({
     status,
@@ -220,6 +222,11 @@ const AdminSessions = () => {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => setDetail(s)}>View details</DropdownMenuItem>
                           <DropdownMenuSeparator />
+                          {s.status === "booked" && (
+                            <DropdownMenuItem onClick={() => setRescheduling({ ...s, withName: `${s.mentor?.full_name ?? "the mentor"} and ${s.mentee?.full_name ?? "the mentee"}` })}>
+                              Reschedule
+                            </DropdownMenuItem>
+                          )}
                           {s.status !== "completed" && <DropdownMenuItem onClick={() => force(s.id, "completed")}>Force complete</DropdownMenuItem>}
                           {s.status !== "no_show" && <DropdownMenuItem onClick={() => force(s.id, "no_show")}>Mark no-show</DropdownMenuItem>}
                           {s.status !== "cancelled" && <DropdownMenuItem className="text-destructive" onClick={() => force(s.id, "cancelled")}>Cancel session</DropdownMenuItem>}
@@ -288,6 +295,7 @@ const AdminSessions = () => {
           )}
         </SheetContent>
       </Sheet>
+      <RescheduleSessionDialog session={rescheduling} onOpenChange={(open) => !open && setRescheduling(null)} />
     </AppLayout>
   );
 };

@@ -1,5 +1,11 @@
-// Send booking confirmation emails via Brevo (transactional email API).
-// Triggered from BookSession.tsx after a successful booking.
+// Booking emails (mentee + mentor) for one session, via Brevo.
+//
+// { sessionId }: confirmation, called by the booking screens right after book_session(). The caller must be the
+// session's mentee or mentor (or an admin); sent at most once per session (sessions.booking_email_sent_at).
+// { sessionId, kind: "rescheduled" }: "your session has moved", called after reschedule_session() by the mentor
+// or an admin; sent once per move (sessions.reschedule_email_pending).
+// Everything is looked up on the server; the caller only names the session.
+import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,6 +22,12 @@ interface Recipient {
 }
 
 interface Payload {
+  sessionId: string;
+  kind?: "booked" | "rescheduled";
+}
+
+// What the emails need, loaded on the server.
+interface BookingDetails {
   mentorEmail: string;
   mentorName: string;
   menteeEmail: string;
@@ -87,15 +99,18 @@ const buildEmailHtml = (opts: {
   meetingUrl: string;
   calendarUrl: string;
   menteeNotes?: string;
+  previousLabel?: string; // set for "rescheduled" emails
 }) => {
-  const { audience, recipientName, otherPartyName, whenLabel, durationMinutes, meetingUrl, calendarUrl, menteeNotes } = opts;
-  const heading =
-    audience === "mentee"
+  const { audience, recipientName, otherPartyName, whenLabel, durationMinutes, meetingUrl, calendarUrl, menteeNotes, previousLabel } = opts;
+  const heading = previousLabel
+    ? `Your session with ${escapeHtml(otherPartyName)} has moved`
+    : audience === "mentee"
       ? `Your session with ${escapeHtml(otherPartyName)} is confirmed`
       : `New session booked with ${escapeHtml(otherPartyName)}`;
 
-  const intro =
-    audience === "mentee"
+  const intro = previousLabel
+    ? `Hi ${escapeHtml(recipientName)}, your mentorship session has a new time (it was ${escapeHtml(previousLabel)}). The meeting link stays the same. Please update your calendar.`
+    : audience === "mentee"
       ? `Hi ${escapeHtml(recipientName)}, your mentorship session is booked. Details below — add it to your calendar so you don't forget!`
       : `Hi ${escapeHtml(recipientName)}, ${escapeHtml(otherPartyName)} just booked a mentorship session with you. Details below.`;
 
@@ -180,32 +195,76 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const json = (payload: unknown, status = 200) =>
+      new Response(JSON.stringify(payload), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) return json({ error: "Not signed in" }, 401);
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    const callerId = userData?.user?.id;
+    if (userErr || !callerId) return json({ error: "Not signed in" }, 401);
+
+    const { sessionId, kind = "booked" } = (await req.json().catch(() => ({}))) as Partial<Payload>;
+    if (!sessionId || typeof sessionId !== "string") return json({ error: "Missing sessionId" }, 400);
+    if (kind !== "booked" && kind !== "rescheduled") return json({ error: "Unknown kind" }, 400);
+    const rescheduled = kind === "rescheduled";
+
+    const admin = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: session } = await admin
+      .from("sessions")
+      .select("id, mentor_id, mentee_id, scheduled_at, duration_minutes, meeting_url, mentee_notes, status, previous_scheduled_at")
+      .eq("id", sessionId)
+      .maybeSingle();
+    if (!session) return json({ error: "Session not found" }, 404);
+    const { data: isAdmin } = await admin.rpc("has_role", { _user_id: callerId, _role: "admin" });
+    if (callerId !== session.mentee_id && callerId !== session.mentor_id && !isAdmin) {
+      return json({ error: "Session not found" }, 404);
+    }
+    // Only the people who can move a session announce a move.
+    if (rescheduled && callerId !== session.mentor_id && !isAdmin) return json({ error: "Session not found" }, 404);
+    if (session.status !== "booked") return json({ ok: true, skipped: "not booked" });
+
+    // Once per session (or per move): claim it before sending, and release the claim if nothing goes out.
+    const claim = rescheduled
+      ? admin.from("sessions").update({ reschedule_email_pending: false }).eq("id", session.id).eq("reschedule_email_pending", true)
+      : admin.from("sessions").update({ booking_email_sent_at: new Date().toISOString() }).eq("id", session.id).is("booking_email_sent_at", null);
+    const { data: claimed } = await claim.select("id");
+    if (!claimed?.length) return json({ ok: true, skipped: "already sent" });
+    const release = () =>
+      admin.from("sessions").update(rescheduled ? { reschedule_email_pending: true } : { booking_email_sent_at: null }).eq("id", session.id);
+
+    const { data: people } = await admin.from("users").select("id, email, full_name").in("id", [session.mentor_id, session.mentee_id]);
+    const mentorRow = people?.find((u) => u.id === session.mentor_id);
+    const menteeRow = people?.find((u) => u.id === session.mentee_id);
+    if (!mentorRow?.email || !menteeRow?.email) return json({ ok: false, error: "Missing email address" }, 200);
+
     const rawKey = Deno.env.get("BREVO_API_KEY");
     if (!rawKey) {
-      return new Response(JSON.stringify({ error: "BREVO_API_KEY not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // Let a later call retry once the key exists.
+      await release();
+      return json({ error: "BREVO_API_KEY not configured" }, 500);
     }
     const apiKey = rawKey.trim();
-    console.log("BREVO_API_KEY debug:", {
-      length: apiKey.length,
-      prefix: apiKey.slice(0, 9),
-      startsWithXkeysib: apiKey.startsWith("xkeysib-"),
-    });
 
-    const body = (await req.json()) as Payload;
-    const required: (keyof Payload)[] = ["mentorEmail", "mentorName", "menteeEmail", "menteeName", "scheduledAtISO", "durationMinutes", "meetingUrl"];
-    for (const k of required) {
-      if (body[k] === undefined || body[k] === null || body[k] === "") {
-        return new Response(JSON.stringify({ error: `Missing field: ${k}` }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
+    const body: BookingDetails = {
+      mentorEmail: mentorRow.email,
+      mentorName: mentorRow.full_name || "your mentor",
+      menteeEmail: menteeRow.email,
+      menteeName: menteeRow.full_name || menteeRow.email,
+      scheduledAtISO: session.scheduled_at,
+      durationMinutes: session.duration_minutes,
+      meetingUrl: session.meeting_url,
+      menteeNotes: session.mentee_notes || undefined,
+    };
 
     const whenLabel = formatDateTime(body.scheduledAtISO);
+    const previousLabel = rescheduled && session.previous_scheduled_at ? formatDateTime(session.previous_scheduled_at) : undefined;
 
     const menteeCalendarUrl = buildGoogleCalendarUrl({
       title: `Mentorship session with ${body.mentorName}`,
@@ -234,6 +293,7 @@ Deno.serve(async (req) => {
       durationMinutes: body.durationMinutes,
       meetingUrl: body.meetingUrl,
       calendarUrl: menteeCalendarUrl,
+      previousLabel,
     });
 
     const mentorHtml = buildEmailHtml({
@@ -245,17 +305,18 @@ Deno.serve(async (req) => {
       meetingUrl: body.meetingUrl,
       calendarUrl: mentorCalendarUrl,
       menteeNotes: body.menteeNotes,
+      previousLabel,
     });
 
     const results = await Promise.allSettled([
       sendBrevo(apiKey, {
         to: { email: body.menteeEmail, name: body.menteeName },
-        subject: `Session confirmed with ${body.mentorName} — ${whenLabel}`,
+        subject: rescheduled ? `Session moved: ${body.mentorName} — ${whenLabel}` : `Session confirmed with ${body.mentorName} — ${whenLabel}`,
         html: menteeHtml,
       }),
       sendBrevo(apiKey, {
         to: { email: body.mentorEmail, name: body.mentorName },
-        subject: `New session booked: ${body.menteeName} — ${whenLabel}`,
+        subject: rescheduled ? `Session moved: ${body.menteeName} — ${whenLabel}` : `New session booked: ${body.menteeName} — ${whenLabel}`,
         html: mentorHtml,
       }),
     ]);
@@ -264,6 +325,10 @@ Deno.serve(async (req) => {
       r.status === "rejected" ? [{ to: i === 0 ? "mentee" : "mentor", error: String(r.reason) }] : []
     );
     if (errors.length) console.error("Brevo send errors:", errors);
+    // Nothing went out (e.g. Brevo down): release the claim so a later call can retry.
+    if (errors.length === results.length) {
+      await release();
+    }
 
     return new Response(JSON.stringify({ ok: errors.length === 0, errors }), {
       status: 200,

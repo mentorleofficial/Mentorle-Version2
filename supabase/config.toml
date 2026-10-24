@@ -23,6 +23,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-booking-email]
+# The function checks the caller's login itself (must be the session's mentee, mentor or an admin).
 verify_jwt = false
 
 [functions.mentor-application-decision-email]

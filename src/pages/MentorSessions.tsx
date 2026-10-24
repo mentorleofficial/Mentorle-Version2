@@ -23,10 +23,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import RescheduleSessionDialog, { type RescheduleTarget } from "@/components/sessions/RescheduleSessionDialog";
 import {
   CheckCircle2,
   X,
   UserX,
+  CalendarClock,
   User,
   FileEdit,
   Video,
@@ -206,6 +208,7 @@ const MentorSessions = () => {
   const [editTopic, setEditTopic] = useState("");
   const [actionItemsTarget, setActionItemsTarget] = useState<MentorSessionRow | null>(null);
   const [selectedMenteeId, setSelectedMenteeId] = useState<string | null>(null);
+  const [rescheduling, setRescheduling] = useState<RescheduleTarget | null>(null);
 
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
   const [search, setSearch] = useState("");
@@ -357,6 +360,11 @@ const MentorSessions = () => {
           label: "Mark no-show",
           icon: <UserX className="h-3.5 w-3.5" />,
           onClick: () => updateStatus.mutate({ id: s.id, status: "no_show" }),
+        },
+        {
+          label: "Reschedule",
+          icon: <CalendarClock className="h-3.5 w-3.5" />,
+          onClick: () => setRescheduling({ ...s, withName: s.mentee?.full_name }),
         },
         {
           label: "Cancel session",
@@ -751,6 +759,8 @@ const MentorSessions = () => {
           if (!open) setSelectedMenteeId(null);
         }}
       />
+
+      <RescheduleSessionDialog session={rescheduling} onOpenChange={(open) => !open && setRescheduling(null)} />
     </AppLayout>
   );
 };
