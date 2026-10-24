@@ -1736,6 +1736,9 @@ export type Database = {
           offering_id: string | null
           program_id: string | null
           reminder_sent_at: string | null
+          previous_scheduled_at: string | null
+          rescheduled_at: string | null
+          reschedule_email_pending: boolean
           rescheduled_from_id: string | null
           scheduled_at: string
           status: Database["public"]["Enums"]["session_status"]
@@ -1758,6 +1761,9 @@ export type Database = {
           offering_id?: string | null
           program_id?: string | null
           reminder_sent_at?: string | null
+          previous_scheduled_at?: string | null
+          rescheduled_at?: string | null
+          reschedule_email_pending?: boolean
           rescheduled_from_id?: string | null
           scheduled_at: string
           status?: Database["public"]["Enums"]["session_status"]
@@ -1780,6 +1786,9 @@ export type Database = {
           offering_id?: string | null
           program_id?: string | null
           reminder_sent_at?: string | null
+          previous_scheduled_at?: string | null
+          rescheduled_at?: string | null
+          reschedule_email_pending?: boolean
           rescheduled_from_id?: string | null
           scheduled_at?: string
           status?: Database["public"]["Enums"]["session_status"]
@@ -2325,6 +2334,10 @@ export type Database = {
       mentor_open_slots: {
         Args: { _days?: number; _from?: string; _ignore_session_id?: string; _offering_id: string }
         Returns: { starts_at: string }[]
+      }
+      reschedule_session: {
+        Args: { _scheduled_at: string; _session_id: string }
+        Returns: undefined
       }
       plus_quota_status: {
         Args: never
