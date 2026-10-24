@@ -1158,10 +1158,7 @@ export type Database = {
           updated_at: string
           user_id: string
           years_experience: number | null
-          allow_reschedule: boolean
-          cancellation_notice_hours: number
           default_meeting_url: string | null
-          reschedule_notice_hours: number
         }
         Insert: {
           allow_mentee_attachments?: boolean
@@ -1190,10 +1187,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           years_experience?: number | null
-          allow_reschedule?: boolean
-          cancellation_notice_hours?: number
           default_meeting_url?: string | null
-          reschedule_notice_hours?: number
         }
         Update: {
           allow_mentee_attachments?: boolean
@@ -1222,10 +1216,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           years_experience?: number | null
-          allow_reschedule?: boolean
-          cancellation_notice_hours?: number
           default_meeting_url?: string | null
-          reschedule_notice_hours?: number
         }
         Relationships: [
           {
@@ -2184,10 +2175,8 @@ export type Database = {
       get_mentor_booking_info: {
         Args: { _mentor_id: string }
         Returns: {
-          allow_reschedule: boolean
           avatar_url: string
           bio: string
-          cancellation_notice_hours: number
           current_organization: string
           current_role: string
           expertise: string[]
@@ -2197,7 +2186,6 @@ export type Database = {
           is_active: boolean
           linkedin_url: string
           minimum_notice_hours: number
-          reschedule_notice_hours: number
           timezone: string
           buffer_time_minutes: number
           years_experience: number
@@ -2331,10 +2319,7 @@ export type Database = {
       mentor_booking_rules: {
         Args: { _mentor_id: string }
         Returns: {
-          allow_reschedule: boolean
-          cancellation_notice_hours: number
           minimum_notice_hours: number
-          reschedule_notice_hours: number
         }[]
       }
       mentor_open_slots: {

@@ -54,16 +54,15 @@ export interface BookingModalProps {
   offeringId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  rescheduleSessionId?: string | null;
   lockOffering?: boolean;
 }
 
-export default function BookingModal({ mentorId, offeringId, open, onOpenChange, rescheduleSessionId, lockOffering }: BookingModalProps) {
+export default function BookingModal({ mentorId, offeringId, open, onOpenChange, lockOffering }: BookingModalProps) {
 
   const { user } = useAuth();
   const { toast } = useToast();
   const { data: staticData, isPending } = useBookSessionStatic(open ? mentorId : undefined);
-  const { data: bookedTimes = [] } = useBookedTimes(open ? mentorId : undefined, rescheduleSessionId ?? undefined);
+  const { data: bookedTimes = [] } = useBookedTimes(open ? mentorId : undefined);
   const bookMutation = useBookSession();
   const qc = useQueryClient();
   const createOrder = useCreateSessionOrder();
@@ -338,7 +337,6 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
         notes,
         title: selectedOffering?.title || `Session with ${mentor?.full_name ?? "mentor"}`,
         topic: "",
-        rescheduleId: rescheduleSessionId ?? null,
         offeringId: selectedOffering?.id || null,
         programId: selectedProgramId,
       });
@@ -350,11 +348,9 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
       setBookedSession({ scheduledAt, meetingUrl });
     } catch (e) {
       const err = e as { message?: string; code?: string };
-      // book_session() raises readable messages (rescheduling closed, finish your profile…); slot clashes too.
+      // book_session() raises readable messages (finish your profile…); slot clashes too.
       const friendly =
-        err?.message?.includes("already been rescheduled")
-          ? "This session has already been rescheduled once."
-          : err?.message?.includes("overlap") || err?.code === "23505"
+        err?.message?.includes("overlap") || err?.code === "23505"
           ? "That slot was just taken — please pick another."
           : err?.message ?? "Booking failed";
       toast({ variant: "destructive", title: "Booking failed", description: friendly });
@@ -491,7 +487,7 @@ export default function BookingModal({ mentorId, offeringId, open, onOpenChange,
                   </Avatar>
                   <div className="min-w-0 flex-1">
                     <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                      {rescheduleSessionId ? "Reschedule session" : "Book a session"}
+                      Book a session
                     </p>
                     <DialogTitle className="text-lg font-bold leading-tight mt-0.5 truncate">
                       {mentor?.full_name ?? "Loading mentor…"}

@@ -32,9 +32,6 @@ export interface BookingMentorProfile {
   timezone: string;
   buffer_time_minutes: number;
   minimum_notice_hours: number;
-  cancellation_notice_hours: number;
-  allow_reschedule: boolean;
-  reschedule_notice_hours: number;
 }
 export interface BookingOffering {
   id: string;
@@ -117,9 +114,6 @@ export function useBookSessionStatic(mentorId?: string) {
             timezone: info.timezone,
             buffer_time_minutes: info.buffer_time_minutes,
             minimum_notice_hours: info.minimum_notice_hours,
-            cancellation_notice_hours: info.cancellation_notice_hours ?? 0,
-            allow_reschedule: info.allow_reschedule ?? true,
-            reschedule_notice_hours: info.reschedule_notice_hours ?? 0,
           }
           : null,
         slots: (slotsRes.data as BookingSlot[] | null) ?? [],
@@ -172,7 +166,6 @@ export interface BookSessionInput {
   notes: string;
   title: string;
   topic?: string;
-  rescheduleId?: string | null;
   offeringId?: string | null;
   programId?: string | null;
 }
@@ -184,9 +177,9 @@ export interface BookSessionResult {
 export function useBookSession() {
   const qc = useQueryClient();
   return useMutation<BookSessionResult, Error, BookSessionInput>({
-    // book_session() checks the offering (free unless rescheduling), the time (an open slot), onboarding and
-    // the mentor's reschedule rules, and sets the length, title and meeting link (the mentor's own or Jitsi).
-    // It also cancels the original when rescheduling. Mentees can't insert sessions directly.
+    // book_session() checks the offering (free only), the time (an open slot) and onboarding, and sets the
+    // length, title and meeting link (the mentor's own or Jitsi). Mentees can't insert sessions directly, and only
+    // admins cancel or reschedule.
     mutationFn: async (input) => {
       if (!input.offeringId) throw new Error("Choose a session type to book");
       const { data, error } = await supabase.rpc("book_session", {
@@ -194,14 +187,13 @@ export function useBookSession() {
         _scheduled_at: input.scheduledAt.toISOString(),
         _notes: input.notes ?? "",
         _program_id: input.programId ?? null,
-        _reschedule_from: input.rescheduleId ?? null,
       });
       const row = Array.isArray(data) ? data[0] : null;
       if (error || !row) throw error || new Error("Booking failed");
       return { sessionId: row.session_id, meetingUrl: row.meeting_url };
     },
     onSuccess: (_res, vars) => {
-      qc.invalidateQueries({ queryKey: bookSessionBookedKey(vars.mentorId, vars.rescheduleId) });
+      qc.invalidateQueries({ queryKey: bookSessionBookedKey(vars.mentorId) });
       qc.invalidateQueries({ queryKey: menteeSessionsKey(vars.menteeId) });
       qc.invalidateQueries({ queryKey: ["mentee-dashboard", vars.menteeId] });
       qc.invalidateQueries({ queryKey: ["mentor", "sessions", vars.mentorId] });

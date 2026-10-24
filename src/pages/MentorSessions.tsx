@@ -25,7 +25,6 @@ import {
 } from "@/components/ui/dialog";
 import {
   CheckCircle2,
-  X,
   UserX,
   User,
   FileEdit,
@@ -357,12 +356,6 @@ const MentorSessions = () => {
           label: "Mark no-show",
           icon: <UserX className="h-3.5 w-3.5" />,
           onClick: () => updateStatus.mutate({ id: s.id, status: "no_show" }),
-        },
-        {
-          label: "Cancel session",
-          icon: <X className="h-3.5 w-3.5" />,
-          onClick: () => updateStatus.mutate({ id: s.id, status: "cancelled" }),
-          destructive: true,
         }
       );
     }

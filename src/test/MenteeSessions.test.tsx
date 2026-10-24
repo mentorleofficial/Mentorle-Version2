@@ -23,7 +23,6 @@ vi.mock("@/features/mentee-sessions/useMenteeSessions", () => ({
   useMenteeSessions: () => mockUseMenteeSessions(),
   useMenteeRatedSessions: () => ({ data: new Set(["session-completed-rated"]) }),
   useMenteeMentorPrograms: () => ({ data: [] }),
-  useCancelMenteeSession: () => ({ isPending: false, mutate: vi.fn() }),
 }));
 
 vi.mock("@/features/programs/hooks/useMyPrograms", () => ({

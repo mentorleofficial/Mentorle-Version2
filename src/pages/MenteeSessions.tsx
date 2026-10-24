@@ -4,23 +4,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
 import {
   MessageSquare,
-  X,
-  RefreshCw,
   Video,
   Star,
   ListTodo,
@@ -36,7 +21,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import SessionActionItemsPanel from "@/components/sessions/SessionActionItemsPanel";
-import BookingModal from "@/components/sessions/BookingModal";
 
 import SessionHeroCard from "@/components/sessions/SessionHeroCard";
 import SessionListCard, {
@@ -56,7 +40,6 @@ import {
   useMenteeSessions,
   useMenteeRatedSessions,
   useMenteeMentorPrograms,
-  useCancelMenteeSession,
   type MenteeSessionRow,
 } from "@/features/mentee-sessions/useMenteeSessions";
 import type { SessionStatus } from "@/features/mentor-sessions/useMentorSessions";
@@ -115,7 +98,6 @@ function toCardData(
 const MenteeSessions = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
 
   const { data: sessions = [], isLoading } = useMenteeSessions(user?.id);
   console.log("DEBUG: Mentee Sessions fetch:", sessions);
@@ -156,11 +138,7 @@ const MenteeSessions = () => {
     return byMentor;
   }, [myPrograms, mentorProgramRows]);
 
-  const cancelMutation = useCancelMenteeSession(user?.id);
-  const [cancelTarget, setCancelTarget] = useState<MenteeSessionRow | null>(null);
-  const [cancelReason, setCancelReason] = useState("");
   const [actionItemsTarget, setActionItemsTarget] = useState<MenteeSessionRow | null>(null);
-  const [rescheduleTarget, setRescheduleTarget] = useState<MenteeSessionRow | null>(null);
 
 
   // Filters
@@ -220,20 +198,6 @@ const MenteeSessions = () => {
   const filteredUpcoming = useMemo(() => sortFn(filterFn(upcoming)), [upcoming, search, programFilter, statusFilter, sort, mentorPrograms]);
   const filteredPast = useMemo(() => sortFn(filterFn(past)), [past, search, programFilter, statusFilter, sort, mentorPrograms]);
 
-  const handleCancel = () => {
-    if (!cancelTarget) return;
-    cancelMutation.mutate(
-      { id: cancelTarget.id, reason: cancelReason },
-      {
-        onSuccess: () => {
-          toast({ title: "Session cancelled" });
-          setCancelTarget(null);
-          setCancelReason("");
-        },
-      }
-    );
-  };
-
   const buildCardActions = (s: MenteeSessionRow, isUpcoming: boolean) => {
     const foundProg = s.program
       ? { name: s.program.name, color: s.program.color, slug: s.program.slug }
@@ -277,21 +241,6 @@ const MenteeSessions = () => {
           filename={`session-${s.id}.ics`}
         />
       );
-
-      if (!s.rescheduled_from_id) {
-        overflow.push({
-          label: "Reschedule",
-          icon: <RefreshCw className="h-3.5 w-3.5" />,
-          onClick: () => setRescheduleTarget(s),
-        });
-      }
-
-      overflow.push({
-        label: "Cancel session",
-        icon: <X className="h-3.5 w-3.5" />,
-        onClick: () => setCancelTarget(s),
-        destructive: true,
-      });
     }
 
     if (s.status === "completed") {
@@ -452,24 +401,6 @@ const MenteeSessions = () => {
     </>
   );
 
-  const heroSecondary = nextSession && (
-    <div className="flex flex-wrap gap-2">
-      {!nextSession.rescheduled_from_id && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setRescheduleTarget(nextSession)}
-        >
-          <RefreshCw className="mr-1 h-3.5 w-3.5" /> Reschedule
-        </Button>
-      )}
-
-      <Button variant="ghost" size="sm" onClick={() => setCancelTarget(nextSession)}>
-        <X className="mr-1 h-3.5 w-3.5" /> Cancel
-      </Button>
-    </div>
-  );
-
   const hasFilters = !!search || programFilter !== "all" || statusFilter !== "all";
   const resultRows = tab === "upcoming" ? filteredUpcoming : filteredPast;
 
@@ -479,7 +410,7 @@ const MenteeSessions = () => {
         <div>
           <h1 className="text-2xl font-bold">My Sessions</h1>
           <p className="text-sm text-muted-foreground">
-            Join, reschedule, and review every session in one place.
+            Join and review every session in one place.
           </p>
         </div>
 
@@ -491,7 +422,6 @@ const MenteeSessions = () => {
           emptyCtaLabel="Find a mentor"
           emptyCtaTo="/mentors"
           primaryActions={heroPrimary}
-          secondaryActions={heroSecondary}
         />
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as "upcoming" | "past")}>
@@ -552,31 +482,6 @@ const MenteeSessions = () => {
         </Tabs>
       </div>
 
-      <AlertDialog open={!!cancelTarget} onOpenChange={(o) => !o && setCancelTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cancel this session?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will free the slot for someone else. You can rebook later if you change your mind.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-2">
-            <Label>Reason (optional)</Label>
-            <Textarea
-              rows={2}
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-              placeholder="Let your mentor know why…"
-            />
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={cancelMutation.isPending}>Keep it</AlertDialogCancel>
-            <AlertDialogAction onClick={handleCancel} disabled={cancelMutation.isPending}>
-              {cancelMutation.isPending ? "Cancelling…" : "Cancel session"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <Dialog open={!!actionItemsTarget} onOpenChange={(o) => !o && setActionItemsTarget(null)}>
         <DialogContent className="max-w-2xl">
@@ -603,16 +508,6 @@ const MenteeSessions = () => {
         </DialogContent>
       </Dialog>
 
-      {rescheduleTarget && (
-        <BookingModal
-          mentorId={rescheduleTarget.mentor_id}
-          offeringId={rescheduleTarget.offering_id ?? undefined}
-          rescheduleSessionId={rescheduleTarget.id}
-          lockOffering
-          open={!!rescheduleTarget}
-          onOpenChange={(o) => !o && setRescheduleTarget(null)}
-        />
-      )}
     </AppLayout>
 
   );

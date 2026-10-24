@@ -91,16 +91,13 @@ export interface AvailabilitySettings {
   timezone: string;
   buffer_time_minutes: number;
   minimum_notice_hours: number;
-  cancellation_notice_hours: number;
-  allow_reschedule: boolean;
-  reschedule_notice_hours: number;
   default_meeting_url: string | null;
 }
 
 export async function fetchAvailabilitySettings(mentorId: string): Promise<AvailabilitySettings> {
   const { data, error } = await supabase
     .from("mentor_profiles")
-    .select("timezone, buffer_time_minutes, minimum_notice_hours, cancellation_notice_hours, allow_reschedule, reschedule_notice_hours, default_meeting_url")
+    .select("timezone, buffer_time_minutes, minimum_notice_hours, default_meeting_url")
     .eq("user_id", mentorId)
     .maybeSingle();
   if (error) throw error;
@@ -108,9 +105,6 @@ export async function fetchAvailabilitySettings(mentorId: string): Promise<Avail
     timezone: data?.timezone ?? "Asia/Kolkata",
     buffer_time_minutes: data?.buffer_time_minutes ?? 0,
     minimum_notice_hours: data?.minimum_notice_hours ?? 0,
-    cancellation_notice_hours: data?.cancellation_notice_hours ?? 0,
-    allow_reschedule: data?.allow_reschedule ?? true,
-    reschedule_notice_hours: data?.reschedule_notice_hours ?? 0,
     default_meeting_url: data?.default_meeting_url ?? null,
   };
 }
