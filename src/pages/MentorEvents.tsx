@@ -127,6 +127,10 @@ export default function MentorEvents() {
 
       const eventPayload: any = {
         title: formData.title,
+        subtitle: formData.subtitle || null,
+        // Empty = the database generates the web address from the title (and keeps it unique).
+        slug: formData.slug || null,
+        highlights: formData.highlights ?? [],
         description: formData.description,
         event_type: formData.event_type,
         college_name: "Online",

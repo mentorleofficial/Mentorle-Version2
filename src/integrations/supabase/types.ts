@@ -340,16 +340,19 @@ export type Database = {
           plus_eligible: boolean
           prerequisites: string | null
           price: number
+          highlights: string[]
           registration_deadline: string | null
           registration_link: string | null
           sessions: Json | null
           speaker_github: string | null
           speaker_image: string | null
           speaker_linkedin: string | null
+          slug: string
           speaker_name: string | null
           start_date: string
           start_time: string
           status: string | null
+          subtitle: string | null
           title: string
           updated_at: string | null
         }
@@ -371,16 +374,19 @@ export type Database = {
           plus_eligible?: boolean
           prerequisites?: string | null
           price?: number
+          highlights?: string[]
           registration_deadline?: string | null
           registration_link?: string | null
           sessions?: Json | null
           speaker_github?: string | null
           speaker_image?: string | null
           speaker_linkedin?: string | null
+          slug?: string
           speaker_name?: string | null
           start_date: string
           start_time: string
           status?: string | null
+          subtitle?: string | null
           title: string
           updated_at?: string | null
         }
@@ -402,16 +408,19 @@ export type Database = {
           plus_eligible?: boolean
           prerequisites?: string | null
           price?: number
+          highlights?: string[]
           registration_deadline?: string | null
           registration_link?: string | null
           sessions?: Json | null
           speaker_github?: string | null
           speaker_image?: string | null
           speaker_linkedin?: string | null
+          slug?: string
           speaker_name?: string | null
           start_date?: string
           start_time?: string
           status?: string | null
+          subtitle?: string | null
           title?: string
           updated_at?: string | null
         }

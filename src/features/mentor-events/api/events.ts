@@ -12,6 +12,10 @@ export interface EventSession {
 export interface EventProgram {
   id: string;
   title: string;
+  // Public page on mentorle.in: /events/<slug>. Generated from the title when left empty (database trigger).
+  slug: string;
+  subtitle: string | null;
+  highlights: string[];
   description: string;
   event_type: string; // 'workshop', 'bootcamp', 'guest_session', 'event', 'other'
   college_name: string;
@@ -73,6 +77,28 @@ async function attachMeetingLinks(events: EventProgram[]): Promise<EventProgram[
       sessions: (event.sessions ?? []).map((session) => (sessionLinks[session.id] ? { ...session, meeting_link: sessionLinks[session.id] } : session)),
     };
   });
+}
+
+// Event web addresses (mentorle.in/events/<slug>): lowercase letters and digits joined by single hyphens.
+export const EVENT_SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+export const EVENT_SLUG_MAX = 80;
+
+// Same rules as the database's generate_event_slug(), for the form's preview.
+export const slugifyEventTitle = (title: string) =>
+  title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-+|-+$)/g, "")
+    .slice(0, 70)
+    .replace(/-+$/, "") || "event";
+
+// True when no other event uses this address. events_programs is publicly readable, so this works for anyone.
+export async function isEventSlugAvailable(slug: string, excludeEventId?: string): Promise<boolean> {
+  let query = supabase.from("events_programs").select("id").eq("slug", slug).limit(1);
+  if (excludeEventId) query = query.neq("id", excludeEventId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return !data?.length;
 }
 
 // Fetch events created by the current mentor

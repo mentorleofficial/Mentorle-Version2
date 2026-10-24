@@ -16,12 +16,21 @@ import {
   User,
   Plus,
   Tag,
-  AlertCircle
+  AlertCircle,
+  ExternalLink
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import SessionManager from "./SessionManager";
 import type { EventProgram, EventSession } from "../api/events";
+import { EVENT_SLUG_MAX, EVENT_SLUG_PATTERN, isEventSlugAvailable, slugifyEventTitle } from "../api/events";
+
+// Where the public event pages live (mentorle.in/events/<slug>).
+const PUBLIC_EVENTS_URL = "https://mentorle.in/events/";
+const SUBTITLE_MAX = 120;
+const HIGHLIGHTS_MAX = 6;
+const HIGHLIGHT_MAX = 90;
+const highlightLines = (text: string) => text.split("\n").map((line) => line.trim()).filter(Boolean);
 
 // Timezone helpers
 const getISTDateString = (date: Date | string) => {
@@ -70,6 +79,9 @@ export default function EventForm({
 }: EventFormProps) {
   const [formData, setFormData] = useState({
     title: "",
+    subtitle: "",
+    slug: "",
+    highlights: "",
     description: "",
     event_type: "workshop",
     location: "Online",
@@ -105,11 +117,18 @@ export default function EventForm({
 
   const [plusEligible, setPlusEligible] = useState(false);
 
+  // Set when the chosen web address turns out to be taken (checked on submit).
+  const [slugTakenError, setSlugTakenError] = useState<string | null>(null);
+  const [checkingSlug, setCheckingSlug] = useState(false);
+
   // Initialize form with existing data when editing
   useEffect(() => {
     if (initialData) {
       setFormData({
         title: initialData.title || "",
+        subtitle: initialData.subtitle || "",
+        slug: initialData.slug || "",
+        highlights: (initialData.highlights ?? []).join("\n"),
         description: initialData.description || "",
         event_type: initialData.event_type || "workshop",
         location: initialData.location || "Online",
@@ -147,7 +166,7 @@ export default function EventForm({
       // Show advanced settings if any are filled
       if (initialData.max_participants || initialData.registration_deadline || 
           initialData.registration_link || initialData.prerequisites || 
-          initialData.learning_outcomes || initialData.speaker_name) {
+          initialData.learning_outcomes || initialData.speaker_name || initialData.highlights?.length) {
         setShowAdvanced(true);
       }
     } else {
@@ -158,6 +177,9 @@ export default function EventForm({
   const resetForm = () => {
     setFormData({
       title: "",
+      subtitle: "",
+      slug: "",
+      highlights: "",
       description: "",
       event_type: "workshop",
       location: "Online",
@@ -190,6 +212,7 @@ export default function EventForm({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    if (name === "slug") setSlugTakenError(null);
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -219,6 +242,15 @@ export default function EventForm({
   const getValidationError = () => {
     if (!formData.title) return "Title is required";
     if (!formData.description) return "Description is required";
+    if (formData.subtitle.trim().length > SUBTITLE_MAX) return `Subtitle must be ${SUBTITLE_MAX} characters or fewer`;
+    const slug = formData.slug.trim();
+    if (slug && (!EVENT_SLUG_PATTERN.test(slug) || slug.length > EVENT_SLUG_MAX)) {
+      return `Web address can only use lowercase letters, numbers and single hyphens (up to ${EVENT_SLUG_MAX} characters)`;
+    }
+    if (slugTakenError) return slugTakenError;
+    const highlights = highlightLines(formData.highlights);
+    if (highlights.length > HIGHLIGHTS_MAX) return `Add up to ${HIGHLIGHTS_MAX} highlights`;
+    if (highlights.some((line) => line.length > HIGHLIGHT_MAX)) return `Keep each highlight under ${HIGHLIGHT_MAX} characters`;
 
     if (isMultiSession) {
       if (sessions.length === 0) return "At least one session is required";
@@ -305,11 +337,23 @@ export default function EventForm({
     return getValidationError() === null;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!isFormValid()) {
       return;
+    }
+
+    // A chosen (or changed) web address must not belong to another event. Empty = generated from the title.
+    const slug = formData.slug.trim();
+    if (slug && slug !== initialData?.slug) {
+      setCheckingSlug(true);
+      const available = await isEventSlugAvailable(slug, initialData?.id).catch(() => true);
+      setCheckingSlug(false);
+      if (!available) {
+        setSlugTakenError("That web address is already used by another event. Choose a different one.");
+        return;
+      }
     }
     
     const validSessions = isMultiSession 
@@ -321,7 +365,10 @@ export default function EventForm({
       speaker_linkedin: formData.speaker_linkedin ? cleanUrl(formData.speaker_linkedin) : "",
       speaker_github: formData.speaker_github ? cleanUrl(formData.speaker_github) : "",
       plus_eligible: plusEligible,
-      sessions: validSessions
+      sessions: validSessions,
+      subtitle: formData.subtitle.trim(),
+      slug,
+      highlights: highlightLines(formData.highlights)
     };
     
     onSubmit(submitData, imageFile);
@@ -358,6 +405,55 @@ export default function EventForm({
                   required
                   className="mt-1.5"
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="subtitle">Subtitle</Label>
+                <Input
+                  id="subtitle"
+                  name="subtitle"
+                  value={formData.subtitle}
+                  onChange={handleInputChange}
+                  placeholder="One line under the title, e.g., Building your tech future with Mentorle"
+                  maxLength={SUBTITLE_MAX}
+                  className="mt-1.5"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Shown under the title on the mentorle.in event page. Optional.</p>
+              </div>
+
+              <div>
+                <Label htmlFor="slug">Web address</Label>
+                <div className="mt-1.5 flex items-stretch overflow-hidden rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+                  <span className="flex items-center border-r border-input bg-muted px-3 text-sm text-muted-foreground whitespace-nowrap">mentorle.in/events/</span>
+                  <input
+                    id="slug"
+                    name="slug"
+                    value={formData.slug}
+                    onChange={(e) => {
+                      setSlugTakenError(null);
+                      const value = e.target.value.toLowerCase().replace(/\s+/g, "-");
+                      setFormData((prev) => ({ ...prev, slug: value }));
+                    }}
+                    placeholder={slugifyEventTitle(formData.title || "your event title")}
+                    maxLength={EVENT_SLUG_MAX}
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    className="h-10 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formData.slug.trim() ? "Lowercase letters, numbers and hyphens." : "Leave empty to use the title."}
+                  {initialData?.slug && formData.slug.trim() && formData.slug.trim() !== initialData.slug && (initialData.participant_count ?? 0) > 0 && (
+                    <span className="block mt-1 text-amber-700">
+                      {initialData.participant_count} {initialData.participant_count === 1 ? "person has" : "people have"} registered. Links already shared to the old address will stop working.
+                    </span>
+                  )}
+                  {initialData?.slug && (
+                    <a href={`${PUBLIC_EVENTS_URL}${initialData.slug}`} target="_blank" rel="noopener noreferrer" className="mt-1 flex w-fit items-center gap-1 text-primary hover:underline">
+                      View on mentorle.in <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                </p>
               </div>
 
               <div>
@@ -738,6 +834,20 @@ export default function EventForm({
                       rows={2}
                     />
                   </div>
+
+                  <div>
+                    <Label htmlFor="highlights">Highlights</Label>
+                    <Textarea
+                      id="highlights"
+                      name="highlights"
+                      value={formData.highlights}
+                      onChange={handleInputChange}
+                      placeholder={"One per line, e.g.\nNetworking with 500+ students\nLive Q&A with the speaker"}
+                      className="mt-1.5"
+                      rows={3}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Up to {HIGHLIGHTS_MAX}, one per line. Shown as "Event Highlights" on mentorle.in.</p>
+                  </div>
                 </div>
 
                 {/* Speaker Details */}
@@ -821,9 +931,9 @@ export default function EventForm({
             </Button>
             <Button 
               type="submit" 
-              disabled={isSubmitting || !isFormValid()}
+              disabled={isSubmitting || checkingSlug || !isFormValid()}
             >
-              {isSubmitting ? "Saving..." : initialData ? "Update Event" : "Create Event"}
+              {isSubmitting || checkingSlug ? "Saving..." : initialData ? "Update Event" : "Create Event"}
             </Button>
           </DialogFooter>
         </form>
