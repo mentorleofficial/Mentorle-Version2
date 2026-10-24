@@ -12,6 +12,10 @@ export interface EventSession {
 export interface EventProgram {
   id: string;
   title: string;
+  // Public page on mentorle.in: /events/<slug>. Generated from the title when left empty (database trigger).
+  slug: string;
+  subtitle: string | null;
+  highlights: string[];
   description: string;
   event_type: string; // 'workshop', 'bootcamp', 'guest_session', 'event', 'other'
   college_name: string;
@@ -49,6 +53,54 @@ export interface EventParticipant {
   } | null;
 }
 
+// Meeting links live in the private event_meeting_links table (migration 20261024130000): the public
+// events_programs row never carries them. This merges in the links the caller may see (admins, the event's
+// creator, registered attendees). Saving still writes meeting_link on the event (and on each session); a
+// database trigger moves it into the private table. "" clears a link, null leaves it unchanged.
+async function attachMeetingLinks(events: EventProgram[]): Promise<EventProgram[]> {
+  if (!events.length) return events;
+  const { data, error } = await supabase.rpc("get_event_meeting_links", { _event_ids: events.map((event) => event.id) });
+  if (error) {
+    // Migration not applied yet: links are still on the event rows themselves.
+    if (error.code === "PGRST202") return events;
+    // Anything else: fail loudly. Showing the forms with blank links would let a save wipe them.
+    throw error;
+  }
+  const links = new Map((data ?? []).map((row) => [row.event_id, row]));
+  return events.map((event) => {
+    const row = links.get(event.id);
+    if (!row) return event;
+    const sessionLinks = (row.session_links ?? {}) as Record<string, string>;
+    return {
+      ...event,
+      meeting_link: row.meeting_link,
+      sessions: (event.sessions ?? []).map((session) => (sessionLinks[session.id] ? { ...session, meeting_link: sessionLinks[session.id] } : session)),
+    };
+  });
+}
+
+// Event web addresses (mentorle.in/events/<slug>): lowercase letters and digits joined by single hyphens.
+export const EVENT_SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+export const EVENT_SLUG_MAX = 80;
+
+// Same rules as the database's generate_event_slug(), for the form's preview.
+export const slugifyEventTitle = (title: string) =>
+  title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-+|-+$)/g, "")
+    .slice(0, 70)
+    .replace(/-+$/, "") || "event";
+
+// True when no other event uses this address. events_programs is publicly readable, so this works for anyone.
+export async function isEventSlugAvailable(slug: string, excludeEventId?: string): Promise<boolean> {
+  let query = supabase.from("events_programs").select("id").eq("slug", slug).limit(1);
+  if (excludeEventId) query = query.neq("id", excludeEventId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return !data?.length;
+}
+
 // Fetch events created by the current mentor
 export async function fetchMentorEvents(mentorUserId: string): Promise<EventProgram[]> {
   const { data: events, error } = await supabase
@@ -58,7 +110,7 @@ export async function fetchMentorEvents(mentorUserId: string): Promise<EventProg
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-  return (events || []) as unknown as EventProgram[];
+  return attachMeetingLinks((events || []) as unknown as EventProgram[]);
 }
 
 // Fetch all events (for admin and mentee listings)
@@ -69,7 +121,7 @@ export async function fetchAllEvents(): Promise<EventProgram[]> {
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-  return (events || []) as unknown as EventProgram[];
+  return attachMeetingLinks((events || []) as unknown as EventProgram[]);
 }
 
 // Create a new event
@@ -85,7 +137,7 @@ export async function createMentorEvent(eventData: Omit<EventProgram, "id" | "cr
     .single();
 
   if (error) throw error;
-  return data as unknown as EventProgram;
+  return (await attachMeetingLinks([data as unknown as EventProgram]))[0];
 }
 
 // Update an existing event
@@ -112,7 +164,7 @@ export async function updateMentorEvent(eventId: string, eventData: Partial<Even
     .single();
 
   if (error) throw error;
-  return data as unknown as EventProgram;
+  return (await attachMeetingLinks([data as unknown as EventProgram]))[0];
 }
 
 // Delete an event

@@ -61,6 +61,14 @@ export function useEventParticipants(eventId?: string) {
   });
 }
 
+// Database errors from saving an event, in words a mentor can act on.
+const saveErrorMessage = (error: { code?: string; message?: string } | null, fallback: string) => {
+  const text = `${error?.code ?? ""} ${error?.message ?? ""}`;
+  if (text.includes("events_programs_slug_key")) return "That web address is already used by another event. Choose a different one.";
+  if (text.includes("events_programs_slug_format")) return "Web addresses can only use lowercase letters, numbers and single hyphens.";
+  return error?.message || fallback;
+};
+
 export function useMentorEventsMutations(mentorId?: string, isAdmin = false) {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -84,7 +92,7 @@ export function useMentorEventsMutations(mentorId?: string, isAdmin = false) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to create event",
+        description: saveErrorMessage(error, "Failed to create event"),
       });
     },
   });
@@ -101,7 +109,7 @@ export function useMentorEventsMutations(mentorId?: string, isAdmin = false) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to update event",
+        description: saveErrorMessage(error, "Failed to update event"),
       });
     },
   });

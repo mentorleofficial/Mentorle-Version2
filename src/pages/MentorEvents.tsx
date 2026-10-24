@@ -127,6 +127,10 @@ export default function MentorEvents() {
 
       const eventPayload: any = {
         title: formData.title,
+        subtitle: formData.subtitle || null,
+        // Empty = the database generates the web address from the title (and keeps it unique).
+        slug: formData.slug || null,
+        highlights: formData.highlights ?? [],
         description: formData.description,
         event_type: formData.event_type,
         college_name: "Online",
@@ -134,7 +138,8 @@ export default function MentorEvents() {
         start_date: startDate,
         end_date: endDate,
         start_time: startDate,
-        meeting_link: hasMultipleSessions ? null : (formData.meeting_link || null),
+        // "" clears the stored link; the database moves any link into the private event_meeting_links table.
+        meeting_link: hasMultipleSessions ? "" : (formData.meeting_link || ""),
         status: formData.status,
         sessions: hasMultipleSessions ? formData.sessions : [],
         max_participants: formData.max_participants ? parseInt(formData.max_participants, 10) : null,

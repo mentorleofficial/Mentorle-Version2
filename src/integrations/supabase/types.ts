@@ -257,6 +257,35 @@ export type Database = {
         }
         Relationships: []
       }
+      event_meeting_links: {
+        Row: {
+          event_id: string
+          meeting_link: string | null
+          session_links: Json
+          updated_at: string
+        }
+        Insert: {
+          event_id: string
+          meeting_link?: string | null
+          session_links?: Json
+          updated_at?: string
+        }
+        Update: {
+          event_id?: string
+          meeting_link?: string | null
+          session_links?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_meeting_links_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events_programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_participants: {
         Row: {
           completion_status: string | null
@@ -311,16 +340,19 @@ export type Database = {
           plus_eligible: boolean
           prerequisites: string | null
           price: number
+          highlights: string[]
           registration_deadline: string | null
           registration_link: string | null
           sessions: Json | null
           speaker_github: string | null
           speaker_image: string | null
           speaker_linkedin: string | null
+          slug: string
           speaker_name: string | null
           start_date: string
           start_time: string
           status: string | null
+          subtitle: string | null
           title: string
           updated_at: string | null
         }
@@ -342,16 +374,19 @@ export type Database = {
           plus_eligible?: boolean
           prerequisites?: string | null
           price?: number
+          highlights?: string[]
           registration_deadline?: string | null
           registration_link?: string | null
           sessions?: Json | null
           speaker_github?: string | null
           speaker_image?: string | null
           speaker_linkedin?: string | null
+          slug?: string
           speaker_name?: string | null
           start_date: string
           start_time: string
           status?: string | null
+          subtitle?: string | null
           title: string
           updated_at?: string | null
         }
@@ -373,20 +408,52 @@ export type Database = {
           plus_eligible?: boolean
           prerequisites?: string | null
           price?: number
+          highlights?: string[]
           registration_deadline?: string | null
           registration_link?: string | null
           sessions?: Json | null
           speaker_github?: string | null
           speaker_image?: string | null
           speaker_linkedin?: string | null
+          slug?: string
           speaker_name?: string | null
           start_date?: string
           start_time?: string
           status?: string | null
+          subtitle?: string | null
           title?: string
           updated_at?: string | null
         }
         Relationships: []
+      }
+      featured_mentors: {
+        Row: {
+          mentor_id: string
+          position: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          mentor_id: string
+          position: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          mentor_id?: string
+          position?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "featured_mentors_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: true
+            referencedRelation: "mentor_profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       feedback: {
         Row: {
@@ -2034,6 +2101,14 @@ export type Database = {
           scheduled_at: string
         }[]
       }
+      get_event_meeting_links: {
+        Args: { _event_ids: string[] }
+        Returns: {
+          event_id: string
+          meeting_link: string
+          session_links: Json
+        }[]
+      }
       get_event_participants: {
         Args: { _event_id: string }
         Returns: {
@@ -2168,12 +2243,31 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      list_featured_mentors: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          bio: string
+          current_organization: string
+          current_role: string
+          domain: string
+          expertise: string[]
+          full_name: string
+          headline: string
+          position: number
+          slug: string
+          user_id: string
+          years_experience: number
+        }[]
+      }
       list_public_mentors: {
         Args: never
         Returns: {
           avatar_url: string
           bio: string
+          current_organization: string
           current_role: string
+          domain: string
           expertise: string[]
           full_name: string
           headline: string
@@ -2233,6 +2327,10 @@ export type Database = {
           _ttl_minutes: number
         }
         Returns: string
+      }
+      set_featured_mentors: {
+        Args: { _mentor_ids: string[] }
+        Returns: undefined
       }
     }
     Enums: {
