@@ -1,11 +1,12 @@
--- Only admins cancel or reschedule sessions.
+-- Only the session's mentor or an admin cancels or reschedules a session; mentees can't.
 --
--- Mentees can no longer cancel or reschedule their bookings, and mentors can no longer cancel or move theirs.
--- Mentors still mark sessions completed / no-show and edit notes on their own sessions.
+-- Mentees can no longer cancel or reschedule their bookings. Mentors keep cancelling (and may move) their own
+-- sessions, alongside marking them completed / no-show and editing notes.
 --
 --   guard_session_changes   blocks cancelling a session, or changing its time or length, unless the caller is
---                           an admin. Server-side jobs and edge functions (no signed-in user) are unaffected.
---   cancel_session()        admins only.
+--                           that session's mentor or an admin. Server-side jobs and edge functions (no signed-in
+--                           user) are unaffected.
+--   cancel_session()        the session's mentor or an admin.
 --   book_session()          new bookings only; _reschedule_from is kept in the signature so older callers still
 --                           resolve, but any value is refused.
 --   mentor settings         cancellation_notice_hours, allow_reschedule and reschedule_notice_hours are dropped
@@ -25,14 +26,14 @@ AS $$
 DECLARE
   uid uuid := auth.uid();
 BEGIN
-  IF uid IS NULL OR public.has_role(uid, 'admin'::public.app_role) THEN
+  IF uid IS NULL OR uid = OLD.mentor_id OR public.has_role(uid, 'admin'::public.app_role) THEN
     RETURN NEW;
   END IF;
   IF NEW.status = 'cancelled' AND OLD.status IS DISTINCT FROM 'cancelled' THEN
-    RAISE EXCEPTION 'Only Mentorle admins can cancel sessions' USING ERRCODE = '42501';
+    RAISE EXCEPTION 'Only your mentor or Mentorle admins can cancel sessions' USING ERRCODE = '42501';
   END IF;
   IF NEW.scheduled_at IS DISTINCT FROM OLD.scheduled_at OR NEW.duration_minutes IS DISTINCT FROM OLD.duration_minutes THEN
-    RAISE EXCEPTION 'Only Mentorle admins can reschedule sessions' USING ERRCODE = '42501';
+    RAISE EXCEPTION 'Only your mentor or Mentorle admins can reschedule sessions' USING ERRCODE = '42501';
   END IF;
   RETURN NEW;
 END;
@@ -43,7 +44,7 @@ CREATE TRIGGER guard_session_changes_trg
   BEFORE UPDATE ON public.sessions
   FOR EACH ROW EXECUTE FUNCTION public.guard_session_changes();
 
--- --- Cancelling: admins only ----------------------------------------------------------------------------------
+-- --- Cancelling: the mentor or an admin ----------------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.cancel_session(_session_id uuid, _reason text DEFAULT '')
 RETURNS void
@@ -55,12 +56,12 @@ DECLARE
   uid uuid := auth.uid();
   s public.sessions%ROWTYPE;
 BEGIN
-  IF uid IS NULL OR NOT public.has_role(uid, 'admin'::public.app_role) THEN
-    RAISE EXCEPTION 'Only Mentorle admins can cancel sessions' USING ERRCODE = '42501';
-  END IF;
   SELECT * INTO s FROM public.sessions WHERE id = _session_id FOR UPDATE;
-  IF s.id IS NULL THEN
+  IF uid IS NULL OR s.id IS NULL OR NOT (s.mentee_id = uid OR s.mentor_id = uid OR public.has_role(uid, 'admin'::public.app_role)) THEN
     RAISE EXCEPTION 'Session not found' USING ERRCODE = 'P0002';
+  END IF;
+  IF s.mentor_id <> uid AND NOT public.has_role(uid, 'admin'::public.app_role) THEN
+    RAISE EXCEPTION 'Only your mentor or Mentorle admins can cancel sessions' USING ERRCODE = '42501';
   END IF;
   IF s.status <> 'booked' THEN
     RAISE EXCEPTION 'Only booked sessions can be cancelled' USING ERRCODE = 'P0001';
@@ -99,7 +100,7 @@ BEGIN
     RAISE EXCEPTION 'Log in to book a session' USING ERRCODE = '42501';
   END IF;
   IF _reschedule_from IS NOT NULL THEN
-    RAISE EXCEPTION 'Only Mentorle admins can reschedule sessions' USING ERRCODE = '42501';
+    RAISE EXCEPTION 'Only your mentor or Mentorle admins can reschedule sessions' USING ERRCODE = '42501';
   END IF;
   IF NOT public.has_role(uid, 'mentee'::public.app_role) THEN
     RAISE EXCEPTION 'Only mentee accounts can book sessions' USING ERRCODE = '42501';

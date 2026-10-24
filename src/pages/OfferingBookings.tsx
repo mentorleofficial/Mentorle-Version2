@@ -9,6 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -16,6 +18,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   useOfferingBookings,
   type OfferingBookingRow,
@@ -74,12 +86,14 @@ const StatusBadge = ({ status }: { status: SessionStatus }) => {
 const BookingCard = ({
   booking,
   offeringId,
+  onCancel,
   onUpdateStatus,
   isUpdating,
   onViewMentee,
 }: {
   booking: OfferingBookingRow;
   offeringId: string;
+  onCancel: (id: string) => void;
   onUpdateStatus: (id: string, status: SessionStatus) => void;
   isUpdating: boolean;
   onViewMentee: (menteeId: string) => void;
@@ -157,6 +171,15 @@ const BookingCard = ({
                 >
                   <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Mark completed
                 </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive hover:text-destructive"
+                  disabled={isUpdating}
+                  onClick={() => onCancel(booking.id)}
+                >
+                  <X className="h-3.5 w-3.5 mr-1.5" /> Cancel
+                </Button>
               </>
             )}
           </div>
@@ -171,6 +194,8 @@ const OfferingBookings = () => {
   const { user } = useAuth();
   const [selectedMentee, setSelectedMentee] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [cancelId, setCancelId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
 
   // filter / sort state
   const [statusFilter, setStatusFilter] = useState<SessionStatus | "all">("all");
@@ -210,6 +235,20 @@ const OfferingBookings = () => {
 
   const handleUpdateStatus = (id: string, status: SessionStatus) => {
     updateStatus.mutate({ id, status });
+  };
+
+  const handleCancelConfirm = () => {
+    if (!cancelId) return;
+    updateStatus.mutate({
+      id: cancelId,
+      status: "cancelled",
+      reason: cancelReason || "Cancelled by mentor",
+    }, {
+      onSuccess: () => {
+        setCancelId(null);
+        setCancelReason("");
+      },
+    });
   };
 
   const handleViewMentee = (menteeId: string) => {
@@ -303,6 +342,7 @@ const OfferingBookings = () => {
                 key={b.id}
                 booking={b}
                 offeringId={offeringId!}
+                onCancel={(id) => { setCancelId(id); setCancelReason(""); }}
                 onUpdateStatus={handleUpdateStatus}
                 isUpdating={updateStatus.isPending}
                 onViewMentee={handleViewMentee}
@@ -322,6 +362,36 @@ const OfferingBookings = () => {
       />
 
       {/* Cancel confirm dialog */}
+      <AlertDialog open={!!cancelId} onOpenChange={(open) => { if (!open) { setCancelId(null); setCancelReason(""); } }}>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this booking?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The mentee will be notified of the cancellation.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-2">
+            <Label className="text-xs text-muted-foreground">Reason (optional)</Label>
+            <Textarea
+              className="mt-1.5"
+              rows={2}
+              placeholder="Let the mentee know why…"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep booking</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleCancelConfirm}
+              disabled={updateStatus.isPending}
+            >
+              {updateStatus.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cancel booking"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 };

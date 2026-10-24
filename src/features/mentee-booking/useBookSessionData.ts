@@ -179,7 +179,7 @@ export function useBookSession() {
   return useMutation<BookSessionResult, Error, BookSessionInput>({
     // book_session() checks the offering (free only), the time (an open slot) and onboarding, and sets the
     // length, title and meeting link (the mentor's own or Jitsi). Mentees can't insert sessions directly, and only
-    // admins cancel or reschedule.
+    // their mentor or an admin cancels or reschedules.
     mutationFn: async (input) => {
       if (!input.offeringId) throw new Error("Choose a session type to book");
       const { data, error } = await supabase.rpc("book_session", {

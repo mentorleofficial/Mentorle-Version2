@@ -23,11 +23,22 @@ import { MenteeDetailsDialog } from "@/features/mentor-mentees/components/Mentee
 import PlusMemberBadge from "@/components/plus/PlusMemberBadge";
 import { useMenteeIsPlusMember } from "@/features/plus/usePlus";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   ArrowLeft,
   Calendar,
   Clock,
   Loader2,
   CheckCircle2,
+  X,
   UserX,
   ExternalLink,
   Save,
@@ -102,6 +113,8 @@ const BookingDetail = () => {
   const [savingDetails, setSavingDetails] = useState(false);
 
   const [menteeDialogOpen, setMenteeDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   const displayMeetingUrl = meetingUrl !== null ? meetingUrl : (booking?.meeting_url ?? "");
   const displayNotes = notes !== null ? notes : (booking?.notes ?? "");
@@ -146,6 +159,21 @@ const BookingDetail = () => {
       { id: booking.id, status: "no_show" },
       {
         onSuccess: () => toast({ title: "Session marked as no-show" }),
+        onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err.message }),
+      }
+    );
+  };
+
+  const handleCancel = () => {
+    if (!booking) return;
+    updateStatus.mutate(
+      { id: booking.id, status: "cancelled", reason: cancelReason || "Cancelled by mentor" },
+      {
+        onSuccess: () => {
+          toast({ title: "Booking cancelled" });
+          setCancelDialogOpen(false);
+          setCancelReason("");
+        },
         onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err.message }),
       }
     );
@@ -514,6 +542,15 @@ const BookingDetail = () => {
               >
                 <UserX className="h-3.5 w-3.5 mr-1.5" /> No-show
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-destructive hover:text-destructive flex-1 sm:flex-none"
+                disabled={updateStatus.isPending}
+                onClick={() => setCancelDialogOpen(true)}
+              >
+                <X className="h-3.5 w-3.5 mr-1.5" /> Cancel
+              </Button>
             </div>
           )}
         </div>
@@ -526,6 +563,37 @@ const BookingDetail = () => {
         onOpenChange={setMenteeDialogOpen}
       />
 
+      {/* Cancel confirm dialog */}
+      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this booking?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will mark the session as cancelled. The mentee will be notified.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-2">
+            <Label className="text-xs text-muted-foreground">Reason (optional)</Label>
+            <Textarea
+              className="mt-1.5"
+              rows={3}
+              placeholder="Let the mentee know why…"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep booking</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleCancel}
+              disabled={updateStatus.isPending}
+            >
+              {updateStatus.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cancel booking"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 };
