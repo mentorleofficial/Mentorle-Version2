@@ -6,7 +6,6 @@ export interface BookingMentor {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
-  email: string | null;
   headline: string | null;
   current_role: string | null;
   current_organization: string | null;
@@ -100,7 +99,6 @@ export function useBookSessionStatic(mentorId?: string) {
             id: info.id,
             full_name: info.full_name,
             avatar_url: info.avatar_url,
-            email: info.email,
             headline: (info as any).headline ?? null,
             current_role: (info as any).current_role ?? null,
             current_organization: (info as any).current_organization ?? null,
@@ -168,7 +166,6 @@ export interface BookSessionInput {
   notes: string;
   title: string;
   topic?: string;
-  rescheduleId?: string | null;
   offeringId?: string | null;
   programId?: string | null;
 }
@@ -180,47 +177,23 @@ export interface BookSessionResult {
 export function useBookSession() {
   const qc = useQueryClient();
   return useMutation<BookSessionResult, Error, BookSessionInput>({
+    // book_session() checks the offering (free only), the time (an open slot) and onboarding, and sets the
+    // length, title and meeting link (the mentor's own or Jitsi). Mentees can't insert sessions directly, and only
+    // their mentor or an admin cancels or reschedules.
     mutationFn: async (input) => {
-      const meetingId =
-        globalThis.crypto?.randomUUID?.() ??
-        `${Date.now()}-${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
-      const meetingUrl = `https://meet.jit.si/mentorle-${meetingId}`;
-
-      const { data: inserted, error } = await supabase
-        .from("sessions")
-        .insert({
-          mentor_id: input.mentorId,
-          mentee_id: input.menteeId,
-          scheduled_at: input.scheduledAt.toISOString(),
-          duration_minutes: input.durationMinutes,
-          mentee_notes: input.notes,
-          title: input.title,
-          topic: input.topic ?? "",
-          meeting_url: meetingUrl,
-          offering_id: input.offeringId || null,
-          program_id: input.programId || null,
-          rescheduled_from_id: input.rescheduleId || null,
-        })
-        .select("id")
-        .single();
-      if (error || !inserted) throw error || new Error("Insert failed");
-
-      if (input.rescheduleId) {
-        await supabase
-          .from("sessions")
-          .update({
-            status: "cancelled",
-            cancelled_by: input.menteeId,
-            cancelled_at: new Date().toISOString(),
-            cancellation_reason: "Rescheduled",
-          })
-          .eq("id", input.rescheduleId);
-      }
-
-      return { sessionId: inserted.id, meetingUrl };
+      if (!input.offeringId) throw new Error("Choose a session type to book");
+      const { data, error } = await supabase.rpc("book_session", {
+        _offering_id: input.offeringId,
+        _scheduled_at: input.scheduledAt.toISOString(),
+        _notes: input.notes ?? "",
+        _program_id: input.programId ?? null,
+      });
+      const row = Array.isArray(data) ? data[0] : null;
+      if (error || !row) throw error || new Error("Booking failed");
+      return { sessionId: row.session_id, meetingUrl: row.meeting_url };
     },
     onSuccess: (_res, vars) => {
-      qc.invalidateQueries({ queryKey: bookSessionBookedKey(vars.mentorId, vars.rescheduleId) });
+      qc.invalidateQueries({ queryKey: bookSessionBookedKey(vars.mentorId) });
       qc.invalidateQueries({ queryKey: menteeSessionsKey(vars.menteeId) });
       qc.invalidateQueries({ queryKey: ["mentee-dashboard", vars.menteeId] });
       qc.invalidateQueries({ queryKey: ["mentor", "sessions", vars.mentorId] });

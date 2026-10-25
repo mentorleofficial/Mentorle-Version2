@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -91,52 +91,6 @@ export function useMenteeRatedSessions(userId?: string, sessionIds?: string[]) {
         .in("session_id", sessionIds!);
       if (error) throw error;
       return new Set((data ?? []).map((r) => r.session_id as string));
-    },
-  });
-}
-
-export function useCancelMenteeSession(userId?: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: { id: string; reason?: string }) => {
-      const { error } = await supabase
-        .from("sessions")
-        .update({
-          status: "cancelled",
-          cancelled_by: userId,
-          cancelled_at: new Date().toISOString(),
-          cancellation_reason: input.reason || "Cancelled by mentee",
-        } as never)
-        .eq("id", input.id);
-      if (error) throw error;
-      return input;
-    },
-    onMutate: async (input) => {
-      await qc.cancelQueries({ queryKey: menteeSessionsKey(userId) });
-      const prev = qc.getQueryData<MenteeSessionRow[]>(menteeSessionsKey(userId));
-      if (prev) {
-        qc.setQueryData<MenteeSessionRow[]>(
-          menteeSessionsKey(userId),
-          prev.map((s) =>
-            s.id === input.id
-              ? {
-                  ...s,
-                  status: "cancelled",
-                  cancelled_at: new Date().toISOString(),
-                  cancellation_reason: input.reason || "Cancelled by mentee",
-                }
-              : s
-          )
-        );
-      }
-      return { prev };
-    },
-    onError: (_e, _v, ctx) => {
-      if (ctx?.prev) qc.setQueryData(menteeSessionsKey(userId), ctx.prev);
-    },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: menteeSessionsKey(userId) });
-      qc.invalidateQueries({ queryKey: ["mentee-dashboard", userId] });
     },
   });
 }

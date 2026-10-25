@@ -24,6 +24,7 @@ export interface AdminSessionRow {
   cancelled_at: string | null;
   mentor_id: string;
   mentee_id: string;
+  offering_id: string | null;
   mentor: { id: string; full_name: string; email: string } | null;
   mentee: { id: string; full_name: string; email: string } | null;
 }
@@ -36,7 +37,7 @@ export const useAdminSessions = (filters: AdminSessionFilters) => {
         .from("sessions")
         .select(
           `id, scheduled_at, duration_minutes, status, notes, mentee_notes, meeting_url,
-           cancellation_reason, cancelled_at, mentor_id, mentee_id,
+           cancellation_reason, cancelled_at, mentor_id, mentee_id, offering_id,
            mentor:users!sessions_mentor_id_fkey(id, full_name, email),
            mentee:users!sessions_mentee_id_fkey(id, full_name, email)`,
         )

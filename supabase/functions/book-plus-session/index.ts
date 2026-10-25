@@ -1,8 +1,7 @@
-// Free Plus booking — does NOT touch Cashfree. Enforces the 2/month quota atomically:
-// creates the session, then calls consume_plus_session() which locks the membership row,
-// re-checks quota, and writes the usage ledger + mentor earning in one transaction.
-// If quota is exhausted the pre-created session is rolled back.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.0";
+// Free Plus booking — does NOT touch Cashfree. Sessions go through book_plus_session() as the mentee (open
+// slot, eligible offering, the plan's free sessions, all in one transaction). Events still register here and
+// use a free session through consume_plus_session(), rolling the registration back when none are left.
+import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -84,46 +83,21 @@ Deno.serve(async (req) => {
       return json({ registration_id: reg.id, usage_id: usageId });
     }
 
-    if (!body.offering_id) return json({ error: "offering_id is required" }, 400);
-    const { data: off } = await admin
-      .from("mentorship_offerings")
-      .select("id, price, mentor_id, plus_eligible, status")
-      .eq("id", body.offering_id)
-      .maybeSingle();
-    if (!off) return json({ error: "Offering not found" }, 404);
-    if (!off.plus_eligible) return json({ error: "This offering is not available under Plus" }, 400);
-
-    const meetingId = crypto.randomUUID();
-    const { data: sess, error: sessErr } = await admin.from("sessions").insert({
-      mentor_id: off.mentor_id,
-      mentee_id: userId,
-      scheduled_at: body.scheduled_at,
-      duration_minutes: body.duration_minutes,
-      mentee_notes: body.notes ?? "",
-      title: body.title ?? "Plus session",
-      topic: body.topic ?? "",
-      meeting_url: `https://meet.jit.si/mentorle-${meetingId}`,
-      offering_id: off.id,
-    }).select("id").single();
-    if (sessErr || !sess) return json({ error: "Failed to create session: " + (sessErr?.message ?? "") }, 500);
-
-    const { data: usageId, error: rpcErr } = await admin.rpc("consume_plus_session", {
-      _user_id: userId,
-      _kind: "session",
-      _mentor_id: off.mentor_id,
-      _reference_id: sess.id,
-      _list_price: Number(off.price ?? 0),
+    if (!body.offering_id || !body.scheduled_at) return json({ error: "offering_id and scheduled_at are required" }, 400);
+    const { data: booked, error: bookErr } = await userClient.rpc("book_plus_session", {
+      _offering_id: body.offering_id,
+      _scheduled_at: body.scheduled_at,
+      _notes: body.notes ?? "",
+      _program_id: null,
     });
-
-    if (rpcErr) {
-      await admin.from("sessions").delete().eq("id", sess.id); // roll back the pre-created session
-      const msg = rpcErr.message ?? "";
-      if (msg.includes("QUOTA_EXHAUSTED")) return json({ error: "Your monthly Plus sessions are used up" }, 409);
+    if (bookErr) {
+      const msg = bookErr.message ?? "";
+      if (msg.includes("QUOTA_EXHAUSTED")) return json({ error: "Your free Plus sessions are used up" }, 409);
       if (msg.includes("NO_ACTIVE_MEMBERSHIP")) return json({ error: "No active Plus membership" }, 403);
-      return json({ error: "Could not book Plus session: " + msg }, 500);
+      return json({ error: msg || "Could not book Plus session" }, bookErr.code === "23P01" ? 409 : 400);
     }
-
-    return json({ session_id: sess.id, usage_id: usageId, meeting_url: `https://meet.jit.si/mentorle-${meetingId}` });
+    const row = (booked as { session_id: string; meeting_url: string }[])[0];
+    return json({ session_id: row.session_id, meeting_url: row.meeting_url });
   } catch (e) {
     return json({ error: String(e) }, 500);
   }

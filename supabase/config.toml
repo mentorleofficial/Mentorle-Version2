@@ -23,6 +23,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-booking-email]
+# The function checks the caller's login itself (must be the session's mentee, mentor or an admin).
 verify_jwt = false
 
 [functions.mentor-application-decision-email]
@@ -50,4 +51,8 @@ verify_jwt = false
 
 # Cashfree -> us: no user JWT; authenticated by HMAC signature inside the function.
 [functions.cashfree-webhook]
+verify_jwt = false
+
+# The buyer checks their own order (Cashfree return page); verifies the JWT inside.
+[functions.cashfree-verify-order]
 verify_jwt = false

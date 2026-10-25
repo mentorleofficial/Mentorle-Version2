@@ -30,7 +30,7 @@ import {
   useToggleActionItem,
   type ActionItem,
 } from "@/features/action-items/useActionItems";
-import { useMentorProfile } from "@/features/mentor-profile";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -62,8 +62,16 @@ export default function SessionActionItemsPanel({
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState<string | null>(null);
 
-  const { data: mentorProfile, refetch: refetchProfile } = useMentorProfile(mentorId);
-  const allowMenteeAttachments = mentorProfile?.allow_mentee_attachments ?? false;
+  // Through mentor_allows_mentee_attachments(): mentees can't read the mentor's profile row.
+  const { data: allowMenteeAttachments = false, refetch: refetchProfile } = useQuery({
+    queryKey: ["mentor-allows-attachments", mentorId],
+    enabled: !!mentorId,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("mentor_allows_mentee_attachments", { _mentor_id: mentorId });
+      if (error) throw error;
+      return Boolean(data);
+    },
+  });
 
   // Refresh data every time the panel opens (sessionId changes = new dialog open).
   useEffect(() => {
@@ -199,14 +207,10 @@ export default function SessionActionItemsPanel({
     try {
       // Pre-flight check for mentees to handle race condition when mentor toggles it off
       if (type === "mentee") {
-        const { data: latestProfile, error: fetchErr } = await supabase
-          .from("mentor_profiles")
-          .select("allow_mentee_attachments")
-          .eq("user_id", mentorId)
-          .single();
+        const { data: allowed, error: fetchErr } = await supabase.rpc("mentor_allows_mentee_attachments", { _mentor_id: mentorId });
         
         if (fetchErr) throw fetchErr;
-        if (!latestProfile?.allow_mentee_attachments) {
+        if (!allowed) {
           toast({
             variant: "destructive",
             title: "Upload disabled",

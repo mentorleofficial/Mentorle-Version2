@@ -8,6 +8,7 @@ import {
   Briefcase, GraduationCap, Instagram,
 } from "lucide-react";
 import { useMenteeDetailsForMentor } from "../useMentorMentees";
+import { openMenteeResume } from "@/lib/menteeResume";
 import { formatTimeWindow } from "@/features/mentee-onboarding/profileOptions";
 import PlusMemberBadge from "@/components/plus/PlusMemberBadge";
 import { useMenteeIsPlusMember } from "@/features/plus/usePlus";
@@ -317,15 +318,14 @@ export const MenteeDetailsDialog = ({ menteeId, open, onOpenChange }: MenteeDeta
                     </a>
                   )}
                   {profile.resume_url && (
-                    <a
-                      href={profile.resume_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => void openMenteeResume(profile.resume_url!).catch(() => undefined)}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border hover:bg-muted transition-colors"
                     >
                       <FileText className="h-3.5 w-3.5" />
                       Resume
-                    </a>
+                    </button>
                   )}
                 </div>
               </>

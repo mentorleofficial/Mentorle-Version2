@@ -1158,6 +1158,7 @@ export type Database = {
           updated_at: string
           user_id: string
           years_experience: number | null
+          default_meeting_url: string | null
         }
         Insert: {
           allow_mentee_attachments?: boolean
@@ -1186,6 +1187,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           years_experience?: number | null
+          default_meeting_url?: string | null
         }
         Update: {
           allow_mentee_attachments?: boolean
@@ -1214,6 +1216,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           years_experience?: number | null
+          default_meeting_url?: string | null
         }
         Relationships: [
           {
@@ -1733,11 +1736,15 @@ export type Database = {
           offering_id: string | null
           program_id: string | null
           reminder_sent_at: string | null
+          previous_scheduled_at: string | null
+          rescheduled_at: string | null
+          reschedule_email_pending: boolean
           rescheduled_from_id: string | null
           scheduled_at: string
           status: Database["public"]["Enums"]["session_status"]
           title: string
           topic: string
+          booking_email_sent_at: string | null
         }
         Insert: {
           cancellation_reason?: string
@@ -1754,11 +1761,15 @@ export type Database = {
           offering_id?: string | null
           program_id?: string | null
           reminder_sent_at?: string | null
+          previous_scheduled_at?: string | null
+          rescheduled_at?: string | null
+          reschedule_email_pending?: boolean
           rescheduled_from_id?: string | null
           scheduled_at: string
           status?: Database["public"]["Enums"]["session_status"]
           title?: string
           topic?: string
+          booking_email_sent_at?: string | null
         }
         Update: {
           cancellation_reason?: string
@@ -1775,11 +1786,15 @@ export type Database = {
           offering_id?: string | null
           program_id?: string | null
           reminder_sent_at?: string | null
+          previous_scheduled_at?: string | null
+          rescheduled_at?: string | null
+          reschedule_email_pending?: boolean
           rescheduled_from_id?: string | null
           scheduled_at?: string
           status?: Database["public"]["Enums"]["session_status"]
           title?: string
           topic?: string
+          booking_email_sent_at?: string | null
         }
         Relationships: [
           {
@@ -1889,6 +1904,19 @@ export type Database = {
           price: number
           slug: string
           updated_at: string
+          access_months: number | null
+          badge: string
+          billing: string
+          cta_label: string
+          event_discount_percent: number
+          featured: boolean
+          free_sessions: number
+          free_sessions_period: string
+          intro: string
+          price_note: string
+          session_discount_percent: number
+          sort_order: number
+          tagline: string
         }
         Insert: {
           benefits?: Json
@@ -1904,6 +1932,19 @@ export type Database = {
           price?: number
           slug: string
           updated_at?: string
+          access_months?: number | null
+          badge?: string
+          billing?: string
+          cta_label?: string
+          event_discount_percent?: number
+          featured?: boolean
+          free_sessions?: number
+          free_sessions_period?: string
+          intro?: string
+          price_note?: string
+          session_discount_percent?: number
+          sort_order?: number
+          tagline?: string
         }
         Update: {
           benefits?: Json
@@ -1919,6 +1960,19 @@ export type Database = {
           price?: number
           slug?: string
           updated_at?: string
+          access_months?: number | null
+          badge?: string
+          billing?: string
+          cta_label?: string
+          event_discount_percent?: number
+          featured?: boolean
+          free_sessions?: number
+          free_sessions_period?: string
+          intro?: string
+          price_note?: string
+          session_discount_percent?: number
+          sort_order?: number
+          tagline?: string
         }
         Relationships: []
       }
@@ -2074,11 +2128,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      book_session: {
+        Args: {
+          _notes?: string
+          _offering_id: string
+          _program_id?: string
+          _reschedule_from?: string
+          _scheduled_at: string
+        }
+        Returns: { meeting_url: string; session_id: string }[]
+      }
       can_mentee_book_mentor: {
         Args: { _mentee: string; _mentor: string }
         Returns: boolean
       }
       check_email_exists: { Args: { email_to_check: string }; Returns: boolean }
+      cancel_session: {
+        Args: { _reason?: string; _session_id: string }
+        Returns: undefined
+      }
       consume_plus_session: {
         Args: {
           _kind: string
@@ -2157,10 +2225,8 @@ export type Database = {
         Returns: {
           avatar_url: string
           bio: string
-          buffer_time_minutes: number
           current_organization: string
           current_role: string
-          email: string
           expertise: string[]
           full_name: string
           headline: string
@@ -2169,6 +2235,7 @@ export type Database = {
           linkedin_url: string
           minimum_notice_hours: number
           timezone: string
+          buffer_time_minutes: number
           years_experience: number
         }[]
       }
@@ -2293,15 +2360,42 @@ export type Database = {
         }[]
       }
       mentee_is_plus_member: { Args: { p_mentee_id: string }; Returns: boolean }
+      mentor_allows_mentee_attachments: {
+        Args: { _mentor_id: string }
+        Returns: boolean
+      }
+      mentor_booking_rules: {
+        Args: { _mentor_id: string }
+        Returns: {
+          minimum_notice_hours: number
+        }[]
+      }
+      mentor_open_slots: {
+        Args: { _days?: number; _from?: string; _ignore_session_id?: string; _offering_id: string }
+        Returns: { starts_at: string }[]
+      }
+      reschedule_session: {
+        Args: { _scheduled_at: string; _session_id: string }
+        Returns: undefined
+      }
       plus_quota_status: {
         Args: never
         Returns: {
           discount_percent: number
+          event_discount_percent: number
           has_membership: boolean
+          period_end: string | null
+          plan_name: string | null
+          plan_slug: string | null
+          quota_period: string | null
           quota_remaining: number
           quota_total: number
           quota_used: number
         }[]
+      }
+      book_plus_session: {
+        Args: { _notes?: string; _offering_id: string; _program_id?: string | null; _scheduled_at: string }
+        Returns: { meeting_url: string; session_id: string }[]
       }
       plus_quota_window_start: {
         Args: { _anchor_day: number; _today: string }

@@ -19,6 +19,7 @@ import {
   useUpdateSessionDetails,
   type SessionStatus,
 } from "@/features/mentor-sessions/useMentorSessions";
+import RescheduleSessionDialog, { type RescheduleTarget } from "@/components/sessions/RescheduleSessionDialog";
 import { MenteeDetailsDialog } from "@/features/mentor-mentees/components/MenteeDetailsDialog";
 import PlusMemberBadge from "@/components/plus/PlusMemberBadge";
 import { useMenteeIsPlusMember } from "@/features/plus/usePlus";
@@ -40,6 +41,7 @@ import {
   CheckCircle2,
   X,
   UserX,
+  CalendarClock,
   ExternalLink,
   Save,
   User,
@@ -115,6 +117,7 @@ const BookingDetail = () => {
   const [menteeDialogOpen, setMenteeDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [rescheduling, setRescheduling] = useState<RescheduleTarget | null>(null);
 
   const displayMeetingUrl = meetingUrl !== null ? meetingUrl : (booking?.meeting_url ?? "");
   const displayNotes = notes !== null ? notes : (booking?.notes ?? "");
@@ -545,6 +548,15 @@ const BookingDetail = () => {
               <Button
                 size="sm"
                 variant="outline"
+                className="flex-1 sm:flex-none"
+                disabled={updateStatus.isPending}
+                onClick={() => setRescheduling({ ...booking, withName: booking.mentee?.full_name })}
+              >
+                <CalendarClock className="h-3.5 w-3.5 mr-1.5" /> Reschedule
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
                 className="text-destructive hover:text-destructive flex-1 sm:flex-none"
                 disabled={updateStatus.isPending}
                 onClick={() => setCancelDialogOpen(true)}
@@ -594,6 +606,8 @@ const BookingDetail = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <RescheduleSessionDialog session={rescheduling} onOpenChange={(open) => !open && setRescheduling(null)} />
     </AppLayout>
   );
 };

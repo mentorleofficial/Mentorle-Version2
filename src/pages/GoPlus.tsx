@@ -31,7 +31,10 @@ import { Check, Sparkles, Loader2 } from "lucide-react";
 const GoPlus = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { data: plans = [], isLoading } = useActivePlans();
+  const { data: allPlans = [], isLoading } = useActivePlans();
+  // The free tier isn't bought; passes link to mentorle.in, legacy subscriptions subscribe here.
+  const plans = allPlans.filter((p) => p.billing !== "free");
+  const menteeSite = (import.meta.env.VITE_MENTEE_SITE_URL as string | undefined) ?? "https://mentorle.in";
   const [activating, setActivating] = useState(false);
   const { data: membership } = useMyMembership(user?.id, activating);
   const { data: quota } = usePlusQuota(!!user);
@@ -44,7 +47,7 @@ const GoPlus = () => {
   const isActive = membership?.status === "active";
   const planInterval = membership?.plan?.interval;
   const isMonthlyMember = isMember && planInterval === "month";
-  const yearlyPlan = plans.find((p) => p.interval === "year");
+  const yearlyPlan = plans.find((p) => p.interval === "year" && p.billing === "subscription");
   const memberBenefits =
     membership?.plan?.benefits?.length
       ? membership.plan.benefits
@@ -226,7 +229,7 @@ const GoPlus = () => {
                   {memberBenefits.map((b, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm">
                       <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                      <span>{b}</span>
+                      <span>{b.replace(/\*\*/g, "")}</span>
                     </li>
                   ))}
                 </ul>
@@ -250,7 +253,7 @@ const GoPlus = () => {
                     {yearlyPlan.benefits.map((b, i) => (
                       <li key={i} className="flex items-start gap-2 text-sm">
                         <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                        <span>{b}</span>
+                        <span>{b.replace(/\*\*/g, "")}</span>
                       </li>
                     ))}
                   </ul>
@@ -283,7 +286,7 @@ const GoPlus = () => {
                   <CardTitle>{plan.name}</CardTitle>
                   <div className="flex items-baseline gap-1">
                     <span className="text-3xl font-semibold">₹{plan.price}</span>
-                    <span className="text-sm text-muted-foreground">/ {plan.interval}</span>
+                    <span className="text-sm text-muted-foreground">/ {plan.billing === "one_time" ? "year" : plan.interval}</span>
                   </div>
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col gap-4">
@@ -291,10 +294,15 @@ const GoPlus = () => {
                     {plan.benefits.map((b, i) => (
                       <li key={i} className="flex items-start gap-2 text-sm">
                         <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                        <span>{b}</span>
+                        <span>{b.replace(/\*\*/g, "")}</span>
                       </li>
                     ))}
                   </ul>
+                  {plan.billing === "one_time" ? (
+                    <Button asChild className="w-full">
+                      <a href={`${menteeSite}/pricing?plan=${plan.slug}`}>Get {plan.name} on mentorle.in</a>
+                    </Button>
+                  ) : (
                   <Button
                     className="w-full"
                     disabled={pendingPlanId === plan.id}
@@ -308,6 +316,7 @@ const GoPlus = () => {
                       `Subscribe ${plan.interval === "year" ? "yearly" : "monthly"}`
                     )}
                   </Button>
+                  )}
                 </CardContent>
               </Card>
             ))}

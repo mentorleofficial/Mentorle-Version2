@@ -36,6 +36,7 @@ import {
   useUpdateSessionStatus,
   type SessionStatus,
 } from "@/features/mentor-sessions/useMentorSessions";
+import RescheduleSessionDialog, { type RescheduleTarget } from "@/components/sessions/RescheduleSessionDialog";
 import { MenteeDetailsDialog } from "@/features/mentor-mentees/components/MenteeDetailsDialog";
 import {
   ArrowLeft,
@@ -44,6 +45,7 @@ import {
   Loader2,
   CalendarCheck,
   CheckCircle2,
+  CalendarClock,
   X,
   User,
   ChevronRight,
@@ -87,6 +89,7 @@ const BookingCard = ({
   booking,
   offeringId,
   onCancel,
+  onReschedule,
   onUpdateStatus,
   isUpdating,
   onViewMentee,
@@ -94,6 +97,7 @@ const BookingCard = ({
   booking: OfferingBookingRow;
   offeringId: string;
   onCancel: (id: string) => void;
+  onReschedule: (booking: OfferingBookingRow) => void;
   onUpdateStatus: (id: string, status: SessionStatus) => void;
   isUpdating: boolean;
   onViewMentee: (menteeId: string) => void;
@@ -171,6 +175,9 @@ const BookingCard = ({
                 >
                   <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Mark completed
                 </Button>
+                <Button size="sm" variant="outline" disabled={isUpdating} onClick={() => onReschedule(booking)}>
+                  <CalendarClock className="h-3.5 w-3.5 mr-1.5" /> Reschedule
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"
@@ -196,6 +203,7 @@ const OfferingBookings = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [cancelId, setCancelId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  const [rescheduling, setRescheduling] = useState<RescheduleTarget | null>(null);
 
   // filter / sort state
   const [statusFilter, setStatusFilter] = useState<SessionStatus | "all">("all");
@@ -343,6 +351,7 @@ const OfferingBookings = () => {
                 booking={b}
                 offeringId={offeringId!}
                 onCancel={(id) => { setCancelId(id); setCancelReason(""); }}
+                onReschedule={(b) => setRescheduling({ ...b, offering_id: offeringId ?? null, withName: b.mentee?.full_name })}
                 onUpdateStatus={handleUpdateStatus}
                 isUpdating={updateStatus.isPending}
                 onViewMentee={handleViewMentee}
@@ -392,6 +401,8 @@ const OfferingBookings = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <RescheduleSessionDialog session={rescheduling} onOpenChange={(open) => !open && setRescheduling(null)} />
     </AppLayout>
   );
 };

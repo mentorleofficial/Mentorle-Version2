@@ -5,6 +5,8 @@ import { paymentReturnUrl } from "@/features/payments/returnUrl";
 export interface Plan {
   id: string;
   name: string;
+  // "one_time" passes (Pro Pass…) are bought on mentorle.in; "free" is the display-only tier.
+  billing: "free" | "one_time" | "subscription";
   slug: string;
   interval: "month" | "year";
   price: number;
@@ -50,6 +52,7 @@ export function useActivePlans() {
           monthly_quota: row.monthly_quota as number,
           benefits: Array.isArray(row.benefits) ? (row.benefits as string[]) : [],
           is_active: row.is_active as boolean,
+          billing: ((row.billing as string) ?? "subscription") as Plan["billing"],
         };
       });
     },
