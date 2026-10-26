@@ -4,6 +4,7 @@ DROP FUNCTION IF EXISTS public.enter_event_on_signup();
 DROP FUNCTION IF EXISTS public.my_event_draw_result();
 DROP FUNCTION IF EXISTS public.event_live_feed();
 DROP FUNCTION IF EXISTS public.event_mode_status();
+DROP FUNCTION IF EXISTS public.event_mode_delete(uuid);
 DROP FUNCTION IF EXISTS public.event_mode_detail(uuid);
 DROP FUNCTION IF EXISTS public.event_draw(uuid);
 DROP FUNCTION IF EXISTS public.event_entry_set_disqualified(uuid, boolean);
