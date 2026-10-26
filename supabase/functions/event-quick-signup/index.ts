@@ -12,7 +12,8 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 const RATE_WINDOW_MINUTES = 10;
-const RATE_MAX_PER_NETWORK = 120;
+// A whole venue usually shares one Wi-Fi address, so this only stops runaway scripts, not a busy room (~1.6 a second).
+const RATE_MAX_PER_NETWORK = 1000;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RESERVED_NAMES = ["admin", "mentor", "mentee"];
 
@@ -47,7 +48,9 @@ Deno.serve(async (req) => {
     if (body.terms !== true) return json({ error: "Please accept the Terms and Privacy Policy.", code: "terms" }, 400);
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-    const { data: running } = await admin.from("event_modes").select("id").is("ended_at", null).or(`ends_at.is.null,ends_at.gt.${new Date().toISOString()}`).maybeSingle();
+    const { data: running, error: runningError } = await admin.from("event_modes").select("id").is("ended_at", null).or(`ends_at.is.null,ends_at.gt.${new Date().toISOString()}`).maybeSingle();
+    // A failed read is "busy, try again", never "event over" (that would send people to the normal signup by mistake).
+    if (runningError) return json({ error: "Lots of people are signing up right now. Please try again in a moment.", code: "busy" }, 503);
     if (!running) return json({ error: "Quick signup isn't available right now.", code: "event_off" }, 403);
 
     const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || req.headers.get("cf-connecting-ip") || "unknown";

@@ -6,6 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import AppLayout from "@/components/AppLayout";
+import TablePagination from "@/components/TablePagination";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,7 @@ type Winner = { entry_id: string; name: string; email: string; phone: string | n
 type Draw = { id: string; drawn_at: string; reveal_at: string; eligible_count: number; winner: Winner | null; drawn_by: string | null };
 type Detail = { event: EventRow & { active: boolean }; entries: Entry[]; draws: Draw[] };
 
+const PER_PAGE = 50;
 const isRunning = (e: EventRow) => !e.ended_at && (!e.ends_at || new Date(e.ends_at) > new Date());
 const when = (iso: string | null) => (iso ? format(new Date(iso), "d MMM yyyy, h:mm a") : "—");
 const openPresenter = (id: string) => window.open(`/admin/event-mode/${id}/stage`, `mentorle-stage-${id}`, "noopener");
@@ -310,6 +312,7 @@ function EventDetail({ detail, onChanged, onDelete }: { detail: Detail; onChange
   const { event, entries, draws } = detail;
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
 
   const counted = entries.filter((e) => !e.disqualified_at);
   const winners = useMemo(() => new Set(draws.map((d) => d.winner?.entry_id)), [draws]);
@@ -363,7 +366,11 @@ function EventDetail({ detail, onChanged, onDelete }: { detail: Detail; onChange
   };
 
   const q = query.trim().toLowerCase();
-  const shown = q ? entries.filter((e) => [e.full_name, e.email, e.phone ?? ""].some((v) => v.toLowerCase().includes(q))) : entries;
+  const matches = q ? entries.filter((e) => [e.full_name, e.email, e.phone ?? ""].some((v) => v.toLowerCase().includes(q))) : entries;
+  // 50 rows a page, so thousands of signups don't slow the page down.
+  const totalPages = Math.max(1, Math.ceil(matches.length / PER_PAGE));
+  const safePage = Math.min(page, totalPages - 1);
+  const shown = matches.slice(safePage * PER_PAGE, (safePage + 1) * PER_PAGE);
   // A draw still counting down isn't shown yet, so this page can't spoil it.
   const revealed = draws.filter((d) => new Date(d.reveal_at) <= new Date());
 
@@ -486,7 +493,7 @@ function EventDetail({ detail, onChanged, onDelete }: { detail: Detail; onChange
           <div className="flex gap-2">
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name, email, phone" className="w-64 pl-8" />
+              <Input value={query} onChange={(e) => { setQuery(e.target.value); setPage(0); }} placeholder="Search name, email, phone" className="w-64 pl-8" />
             </div>
             <Button variant="outline" onClick={exportCsv} disabled={!entries.length}>
               <Download className="mr-2 h-4 w-4" /> CSV
@@ -543,6 +550,7 @@ function EventDetail({ detail, onChanged, onDelete }: { detail: Detail; onChange
               )}
             </TableBody>
           </Table>
+          <TablePagination className="mt-4" page={safePage} totalPages={totalPages} onPageChange={setPage} />
         </CardContent>
       </Card>
 
