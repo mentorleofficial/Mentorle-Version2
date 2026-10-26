@@ -30,6 +30,17 @@ Deno.serve(async (req) => {
       await settleFailed(admin, payment, { source: "verify", order: order.data });
       return json({ ...outcomeOf(payment), status: "failed" });
     }
+    // A failed attempt leaves the order ACTIVE (Cashfree allows retries on its page). The buyer is back on our
+    // status page, so when every attempt failed or was dropped, close the order (no late charge) and report it.
+    const attempts = await cashfree(`/orders/${encodeURIComponent(orderId)}/payments`);
+    const list = attempts.ok && Array.isArray(attempts.data) ? (attempts.data as { payment_status?: string }[]) : [];
+    if (list.length && list.every((p) => ["FAILED", "USER_DROPPED", "CANCELLED"].includes(String(p.payment_status)))) {
+      const closed = await cashfree(`/orders/${encodeURIComponent(orderId)}`, { method: "PATCH", body: { order_status: "TERMINATED" } });
+      if (closed.ok) {
+        await settleFailed(admin, payment, { source: "verify", order: closed.data, payments: list });
+        return json({ ...outcomeOf(payment), status: "failed" });
+      }
+    }
     return json({ ...outcomeOf(payment), status: "pending" });
   } catch (e) {
     console.error("cashfree-verify-order", e);
