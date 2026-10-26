@@ -18,6 +18,10 @@ const LIGHT = new Set(["#f6b399", "#ffd7c6"]);
 // Repeating colours; the last segment never matches the first one it touches.
 const colourAt = (i: number, total: number) => (i === total - 1 && i > 0 && i % SEGMENTS.length === 0 ? SEGMENTS[2] : SEGMENTS[i % SEGMENTS.length]);
 const LABEL_LIMIT = 60; // above this, segments are too thin to label
+// Above this, neighbouring names are drawn as BANDS solid colour bands instead of hairline slices (which blur into a
+// pattern on a projector). Every name keeps its exact place; the pointer and ticker still go name by name.
+const BAND_FROM = 120;
+const BANDS = 24;
 const BULBS = 24;
 const R = 100;
 const VIEW = "-118 -118 236 236";
@@ -39,24 +43,25 @@ const Face = memo(function Face({ names }: { names: WheelName[] }) {
   const labelled = count <= LABEL_LIMIT;
   const fontSize = Math.min(8.5, Math.max(3.2, seg * 0.62));
   const maxChars = count > 30 ? 14 : 18;
-  const thin = count > 150; // no dividers once segments are hairlines
+  const banded = count > BAND_FROM;
+  const arc = (from: number, to: number) => {
+    const a0 = ((from - 90) * Math.PI) / 180;
+    const a1 = ((to - 90) * Math.PI) / 180;
+    return `M0 0 L${R * Math.cos(a0)} ${R * Math.sin(a0)} A${R} ${R} 0 ${to - from > 180 ? 1 : 0} 1 ${R * Math.cos(a1)} ${R * Math.sin(a1)} Z`;
+  };
   return (
     <svg viewBox={VIEW} className="h-full w-full" aria-hidden>
       {count === 0 && <circle r={R} fill="#f3f3f3" />}
       {count === 1 && <circle r={R} fill={SEGMENTS[0]} />}
       {count > 1 &&
-        names.map((n, i) => {
-          const a0 = ((i * seg - 90) * Math.PI) / 180;
-          const a1 = (((i + 1) * seg - 90) * Math.PI) / 180;
-          return (
-            <path
-              key={n.id}
-              d={`M0 0 L${R * Math.cos(a0)} ${R * Math.sin(a0)} A${R} ${R} 0 ${seg > 180 ? 1 : 0} 1 ${R * Math.cos(a1)} ${R * Math.sin(a1)} Z`}
-              fill={colourAt(i, count)}
-              stroke={thin ? undefined : "#ffffff"}
-              strokeWidth={thin ? undefined : 0.6}
-            />
-          );
+        !banded &&
+        names.map((n, i) => <path key={n.id} d={arc(i * seg, (i + 1) * seg)} fill={colourAt(i, count)} stroke="#ffffff" strokeWidth={0.6} />)}
+      {banded &&
+        Array.from({ length: BANDS }, (_, k) => {
+          // Band k covers names [start, end): whole names only, so a band edge never splits a name's slice.
+          const start = Math.floor((k * count) / BANDS);
+          const end = Math.floor(((k + 1) * count) / BANDS);
+          return <path key={k} d={arc(start * seg, end * seg)} fill={SEGMENTS[k % SEGMENTS.length]} stroke="#ffffff" strokeWidth={0.6} />;
         })}
       {labelled &&
         names.map((n, i) => {
