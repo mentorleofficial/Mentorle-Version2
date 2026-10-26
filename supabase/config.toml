@@ -56,3 +56,6 @@ verify_jwt = false
 # The buyer checks their own order (Cashfree return page); verifies the JWT inside.
 [functions.cashfree-verify-order]
 verify_jwt = false
+
+[functions.send-membership-reminders]
+verify_jwt = false
