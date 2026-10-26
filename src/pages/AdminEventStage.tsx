@@ -19,8 +19,10 @@ const db = supabase as unknown as SupabaseClient;
 const INK = "#2b2b2b";
 const BRAND = "#e8501b";
 const CONFETTI = [BRAND, INK, "#f6b399", "#b6370a", "#ffd7c6"];
-// Same as a real spin: the 6-second lead-in plus the 12-second countdown on phones.
-const PREVIEW_SECONDS = 18;
+// Same as a real spin: the 2.5-second lead-in plus the 12-second countdown on phones.
+const PREVIEW_SECONDS = 14.5;
+// Phones checking every ~5s (+ jitter) all see "presenter open" within this, and switch to checking every second.
+const PHONES_READY_MS = 7000;
 const FIRST = ["Riya", "Arjun", "Simran", "Kabir", "Ananya", "Rohan", "Isha", "Dev", "Meera", "Vikram", "Tara", "Nikhil", "Priya", "Aditya", "Sneha", "Karan", "Neha", "Rahul"];
 const LAST = ["Sharma", "Mehta", "Kaur", "Singh", "Gupta", "Verma", "Patel", "Malhotra", "Joshi", "Rao", "Sen", "Bansal", "Nair", "Kapoor", "Iyer", "Arora", "Chauhan", "Khanna"];
 // ?names=2000 on the preview: a big made-up list, to see how the wheel looks and runs with thousands of people.
@@ -95,6 +97,22 @@ const AdminEventStage = () => {
     else setDetail(data as Detail | null);
   }, [id, preview]);
 
+  // Tell phones the presenter screen is open (they switch to checking every second), and give them a moment to switch
+  // before the first spin: phones that were checking every 5s all hear about it within ~6s.
+  const [phonesReady, setPhonesReady] = useState(preview);
+  useEffect(() => {
+    if (preview || !id) return;
+    // Supabase queries only run when awaited, so .then() it.
+    const ping = () => void db.rpc("event_presenter_ping", { _event_id: id }).then(() => undefined);
+    ping();
+    const timer = setInterval(ping, 15_000);
+    const ready = setTimeout(() => setPhonesReady(true), PHONES_READY_MS);
+    return () => {
+      clearInterval(timer);
+      clearTimeout(ready);
+    };
+  }, [id, preview]);
+
   // Keep the names fresh until a spin starts.
   useEffect(() => {
     void load();
@@ -122,7 +140,7 @@ const AdminEventStage = () => {
   const names = wheelNames ?? eligible;
 
   const draw = useCallback(async () => {
-    if (busy || winner || !id || names.length === 0) return;
+    if (busy || winner || !id || names.length === 0 || !phonesReady) return;
     setBusy(true);
     if (preview) {
       // Practice spin: a random sample name, nothing saved.
@@ -144,7 +162,7 @@ const AdminEventStage = () => {
     setWheelNames(result.pool);
     setPending(result.winner.name);
     setSpin({ key: result.draw_id, winnerId: result.winner.entry_id, durationMs: Math.max(3000, result.reveal_in * 1000 - (performance.now() - began)) });
-  }, [busy, winner, id, names, preview, toast]);
+  }, [busy, winner, id, names, preview, toast, phonesReady]);
 
   const done = () => {
     setWinner(pending);
@@ -233,12 +251,12 @@ const AdminEventStage = () => {
           <button
             type="button"
             onClick={() => void draw()}
-            disabled={busy || names.length === 0 || Boolean(winner)}
+            disabled={busy || names.length === 0 || Boolean(winner) || !phonesReady}
             className="mt-[4.5vh] inline-flex h-[clamp(3.5rem,8vh,5.25rem)] items-center border border-[#e8501b] bg-[#e8501b] px-[clamp(2rem,4vw,4rem)] text-[clamp(1.1rem,1.9vw,1.8rem)] text-white transition hover:bg-[#b6370a] focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-[#2b2b2b] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {busy ? "Spinning…" : drawn > 0 ? "Draw again" : "Spin the wheel"}
+            {busy ? "Spinning…" : !phonesReady ? "Getting phones ready…" : drawn > 0 ? "Draw again" : "Spin the wheel"}
           </button>
-          {!busy && names.length > 0 && <p className="mt-3 text-sm text-[#808080]">or press Space</p>}
+          {!busy && names.length > 0 && <p className="mt-3 text-sm text-[#808080]">{phonesReady ? "or press Space" : "Phones on the live page are switching to fast updates."}</p>}
           {names.length === 0 && !busy && <p className="mt-3 text-sm text-[#808080]">No one is in the draw yet.</p>}
           {error && <p className="mt-6 text-sm text-red-600">{error}</p>}
         </section>
