@@ -62,6 +62,7 @@ const MenteeTasks = lazy(() => import("@/pages/MenteeTasks"));
 const GoPlus = lazy(() => import("@/pages/GoPlus"));
 const AdminMemberships = lazy(() => import("@/pages/AdminMemberships"));
 const AdminEventMode = lazy(() => import("@/pages/AdminEventMode"));
+const AdminEventStage = lazy(() => import("@/pages/AdminEventStage"));
 const MentorEarnings = lazy(() => import("@/pages/MentorEarnings"));
 const AdminWithdrawals = lazy(() => import("@/pages/AdminWithdrawals"));
 const AdminMentorEarnings = lazy(() => import("@/pages/AdminMentorEarnings"));
@@ -107,6 +108,7 @@ const App = () => (
                   <Route path="/admin/sessions" element={<RoleGuard allowedRoles={["admin"]}><AdminSessions /></RoleGuard>} />
                   <Route path="/admin/memberships" element={<RoleGuard allowedRoles={["admin"]}><AdminMemberships /></RoleGuard>} />
                   <Route path="/admin/event-mode" element={<RoleGuard allowedRoles={["admin"]}><AdminEventMode /></RoleGuard>} />
+                  <Route path="/admin/event-mode/:id/stage" element={<RoleGuard allowedRoles={["admin"]}><AdminEventStage /></RoleGuard>} />
                   <Route path="/admin/withdrawals" element={<RoleGuard allowedRoles={["admin"]}><AdminWithdrawals /></RoleGuard>} />
                   <Route path="/admin/mentor-earnings" element={<RoleGuard allowedRoles={["admin"]}><AdminMentorEarnings /></RoleGuard>} />
                   <Route path="/admin/feedback" element={<RoleGuard allowedRoles={["admin"]}><AdminFeedback /></RoleGuard>} />
