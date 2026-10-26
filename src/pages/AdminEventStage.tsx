@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import confetti from "canvas-confetti";
 import { ArrowLeft, Maximize2, Minimize2 } from "lucide-react";
@@ -12,13 +12,20 @@ import type { WheelName, WheelSpin } from "@/features/event-mode/LuckyWheel";
 // at the end, the winner's name: never emails or phone numbers (those stay on the Event mode page). Spin (or Space)
 // asks the server for the winner (event_draw); the wheel lands on them as attendees' phones finish counting down.
 // Styled like mentorle.in (Manrope, the ink header bar, white dot grid, orange accents, square corners), since the
-// room sees it. /admin/event-mode/preview/stage is a practice run with sample names: nothing is drawn or saved.
+// room sees it. /admin/event-mode/preview/stage is a practice run with sample names (add ?names=2000 for a big wheel):
+// nothing is drawn or saved.
 
 const db = supabase as unknown as SupabaseClient;
 const INK = "#2b2b2b";
 const BRAND = "#e8501b";
 const CONFETTI = [BRAND, INK, "#f6b399", "#b6370a", "#ffd7c6"];
-const PREVIEW_SECONDS = 12;
+// Same as a real spin: the 6-second lead-in plus the 12-second countdown on phones.
+const PREVIEW_SECONDS = 18;
+const FIRST = ["Riya", "Arjun", "Simran", "Kabir", "Ananya", "Rohan", "Isha", "Dev", "Meera", "Vikram", "Tara", "Nikhil", "Priya", "Aditya", "Sneha", "Karan", "Neha", "Rahul"];
+const LAST = ["Sharma", "Mehta", "Kaur", "Singh", "Gupta", "Verma", "Patel", "Malhotra", "Joshi", "Rao", "Sen", "Bansal", "Nair", "Kapoor", "Iyer", "Arora", "Chauhan", "Khanna"];
+// ?names=2000 on the preview: a big made-up list, to see how the wheel looks and runs with thousands of people.
+const sampleNames = (count: number) =>
+  Array.from({ length: count }, (_, i) => ({ id: `sample-${i}`, name: `${FIRST[i % FIRST.length]} ${LAST[(i * 7 + Math.floor(i / FIRST.length)) % LAST.length]}` }));
 const SAMPLE_NAMES = [
   "Riya Sharma", "Arjun Mehta", "Simran Kaur", "Kabir Singh", "Ananya Gupta", "Rohan Verma", "Isha Patel", "Dev Malhotra", "Meera Joshi",
   "Vikram Rao", "Tara Sen", "Nikhil Bansal", "Priya Nair", "Aditya Kapoor", "Sneha Iyer", "Karan Arora", "Neha Chauhan", "Rahul Khanna",
@@ -58,6 +65,10 @@ const AdminEventStage = () => {
   useManrope();
   const { id } = useParams<{ id: string }>();
   const preview = id === "preview";
+  const [samples] = useState(() => {
+    const requested = Number(new URLSearchParams(window.location.search).get("names"));
+    return requested > 0 ? sampleNames(Math.min(5000, Math.floor(requested))) : SAMPLE_NAMES;
+  });
   const { toast } = useToast();
   const root = useRef<HTMLDivElement>(null);
   const [detail, setDetail] = useState<Detail | null>(null);
@@ -66,7 +77,13 @@ const AdminEventStage = () => {
   const [busy, setBusy] = useState(false);
   const [spin, setSpin] = useState<WheelSpin | null>(null);
   const [wheelNames, setWheelNames] = useState<WheelName[] | null>(null);
-  const [ticker, setTicker] = useState<string | null>(null);
+  // The name under the pointer changes almost every frame with thousands of names: written straight to the page.
+  const tickerEl = useRef<HTMLParagraphElement>(null);
+  const lastTick = useRef<string | null>(null);
+  const onTick = useCallback((name: string | null) => {
+    lastTick.current = name;
+    if (tickerEl.current) tickerEl.current.textContent = name ?? "";
+  }, []);
   const [pending, setPending] = useState<string | null>(null);
   const [winner, setWinner] = useState<string | null>(null);
   const [previewDraws, setPreviewDraws] = useState<string[]>([]);
@@ -81,7 +98,7 @@ const AdminEventStage = () => {
   // Keep the names fresh until a spin starts.
   useEffect(() => {
     void load();
-    const timer = setInterval(() => !busy && void load(), 5000);
+    const timer = setInterval(() => !busy && void load(), 8000);
     return () => clearInterval(timer);
   }, [load, busy]);
 
@@ -91,13 +108,17 @@ const AdminEventStage = () => {
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
-  const winners = new Set((detail?.draws ?? []).map((d) => d.winner?.entry_id));
-  const eligible: WheelName[] = preview
-    ? SAMPLE_NAMES.filter((n) => !previewDraws.includes(n.id))
-    : (detail?.entries ?? [])
-        .filter((e) => e.in_draw && !e.disqualified_at && !winners.has(e.id))
-        .reverse()
-        .map((e) => ({ id: e.id, name: e.full_name }));
+  // Recomputed only when the entries change, so the wheel's face isn't redrawn on every refresh.
+  const eligibleKey = preview ? previewDraws.join() : JSON.stringify([detail?.entries.map((e) => [e.id, e.full_name, e.disqualified_at, e.in_draw]), detail?.draws.map((d) => d.winner?.entry_id)]);
+  const eligible: WheelName[] = useMemo(() => {
+    if (preview) return samples.filter((n) => !previewDraws.includes(n.id));
+    const winners = new Set((detail?.draws ?? []).map((d) => d.winner?.entry_id));
+    return (detail?.entries ?? [])
+      .filter((e) => e.in_draw && !e.disqualified_at && !winners.has(e.id))
+      .reverse()
+      .map((e) => ({ id: e.id, name: e.full_name }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eligibleKey]);
   const names = wheelNames ?? eligible;
 
   const draw = useCallback(async () => {
@@ -182,7 +203,7 @@ const AdminEventStage = () => {
 
       <main className="relative z-10 grid flex-1 items-center gap-[3vw] px-[4vw] py-[3vh] lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
         <div className="mx-auto w-full max-w-[min(76vh,92vw)]">
-          <LuckyWheel names={names} spin={spin} onDone={done} onTick={setTicker} />
+          <LuckyWheel names={names} spin={spin} onDone={done} onTick={onTick} />
         </div>
 
         <section className="text-center lg:text-left">
@@ -196,7 +217,9 @@ const AdminEventStage = () => {
             {busy ? (
               <>
                 <p className="text-[clamp(0.8rem,1.1vw,1rem)] uppercase tracking-[0.14em] text-[#808080]">Spinning</p>
-                <p className="mt-1 truncate text-[clamp(2.25rem,5.2vw,5.25rem)] font-bold leading-none text-[#e8501b]">{ticker}</p>
+                <p ref={tickerEl} className="mt-1 truncate text-[clamp(2.25rem,5.2vw,5.25rem)] font-bold leading-none text-[#e8501b]">
+                  {lastTick.current}
+                </p>
               </>
             ) : (
               <>
