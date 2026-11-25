@@ -20,6 +20,9 @@ import {
   useMyPayoutAccount,
   useSavePayoutAccount,
   useRequestWithdrawal,
+  earningTotals,
+  EARNING_STATUS_LABEL,
+  EARNING_STATUS_VARIANT,
   earningsKey,
   withdrawalsKey,
   payoutAccountKey,
@@ -33,7 +36,7 @@ const SOURCE_LABEL: Record<string, string> = {
   adjustment: "Adjustment",
 };
 
-const inr = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+const inr = (n: number) => `${Number(n) < 0 ? "−" : ""}₹${Math.abs(Number(n)).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 
 const EARN_PER_PAGE = 10;
 const WD_PER_PAGE = 5;
@@ -70,7 +73,7 @@ const MentorEarnings = () => {
     setHolder(account.details?.holder_name ?? "");
   }, [account]);
 
-  const available = earnings.filter((e) => e.status === "accrued").reduce((s, e) => s + e.net_amount, 0);
+  const { available, onHold } = earningTotals(earnings);
   const pending = withdrawals
     .filter((w) => w.status === "requested" || w.status === "approved")
     .reduce((s, w) => s + w.amount, 0);
@@ -130,10 +133,17 @@ const MentorEarnings = () => {
         </div>
 
         {/* Balance summary */}
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="pb-2"><CardDescription>Available to withdraw</CardDescription></CardHeader>
             <CardContent><p className="text-2xl font-semibold">{inr(available)}</p></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2"><CardDescription>On hold</CardDescription></CardHeader>
+            <CardContent>
+              <p className="text-2xl font-semibold">{inr(onHold)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Released when the session is completed or the event ends.</p>
+            </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2"><CardDescription>Pending payout</CardDescription></CardHeader>
@@ -240,9 +250,9 @@ const MentorEarnings = () => {
                           <TableCell>{format(new Date(e.created_at), "d MMM yyyy")}</TableCell>
                           <TableCell>{SOURCE_LABEL[e.source] ?? e.source}</TableCell>
                           <TableCell className="text-right">{inr(e.gross_amount)}</TableCell>
-                          <TableCell className="text-right text-muted-foreground">−{inr(e.fee_amount)}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">{e.fee_amount < 0 ? "+" : "−"}{inr(Math.abs(e.fee_amount))}</TableCell>
                           <TableCell className="text-right font-medium">{inr(e.net_amount)}</TableCell>
-                          <TableCell><Badge variant="secondary" className="capitalize">{e.status}</Badge></TableCell>
+                          <TableCell><Badge variant={EARNING_STATUS_VARIANT[e.status] ?? "secondary"}>{EARNING_STATUS_LABEL[e.status] ?? e.status}</Badge></TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

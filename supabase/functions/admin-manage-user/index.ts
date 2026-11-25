@@ -1,6 +1,6 @@
 // Admin user management — create (invite or temp password), disable, restore.
 // Uses service-role internally so it never hijacks the admin's auth session.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.0";
+import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

@@ -1,7 +1,7 @@
 // Sends a "Thank you for applying" email to a mentor applicant via Brevo.
 // Called client-side (fire-and-forget) after a successful application insert.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

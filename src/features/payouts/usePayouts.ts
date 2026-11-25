@@ -11,6 +11,28 @@ export interface Earning {
   created_at: string;
 }
 
+// Earning statuses (see migration 20261125130000_mentor_earnings_hold): 'pending' is held until the session is
+// completed / the event ends (or 7 days after the session), 'reversed' was taken back by a cancellation or refund.
+export const EARNING_STATUS_LABEL: Record<string, string> = {
+  pending: "On hold",
+  accrued: "Available",
+  withdrawn: "Withdrawn",
+  reversed: "Reversed",
+};
+
+export const EARNING_STATUS_VARIANT: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
+  pending: "outline",
+  accrued: "default",
+  withdrawn: "secondary",
+  reversed: "destructive",
+};
+
+/** Withdrawable balance (accrued, including negative adjustments) and the amount still on hold. */
+export function earningTotals(earnings: Earning[]) {
+  const sum = (status: string) => earnings.filter((e) => e.status === status).reduce((total, e) => total + Number(e.net_amount), 0);
+  return { available: sum("accrued"), onHold: sum("pending") };
+}
+
 export interface Withdrawal {
   id: string;
   amount: number;

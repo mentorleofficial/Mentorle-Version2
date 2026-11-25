@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useBranding } from "@/contexts/BrandingContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  Mic,
   Radio,
   LayoutDashboard,
   Users,
@@ -77,6 +78,7 @@ const AppSidebar = () => {
     { title: "Mentor Earnings", icon: Coins, path: "/admin/mentor-earnings" },
     { title: "Events", icon: CalendarDays, path: "/admin/events" },
     { title: "Event mode", icon: Radio, path: "/admin/event-mode" },
+    { title: "Speaker requests", icon: Mic, path: "/admin/speaker-requests" },
     { title: "Feedback", icon: Star, path: "/admin/feedback" },
     { title: "Platform Feedback", icon: MessageCircle, path: "/admin/general-feedback" },
     { title: "Leaderboard", icon: Trophy, path: "/mentor/leaderboard" },
