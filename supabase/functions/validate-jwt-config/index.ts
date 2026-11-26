@@ -1,8 +1,8 @@
 // Validate a sample JWT against the saved jwt_config (admin-only).
 // Pure validation: returns header, payload, mapped user fields, and any errors.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { jwtVerify, importSPKI, importJWK, createRemoteJWKSet } from "https://esm.sh/jose@5.9.6";
+import { createClient } from "npm:@supabase/supabase-js@2.57.0";
+import { jwtVerify, importSPKI, importJWK, createRemoteJWKSet } from "npm:jose@5.9.6";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

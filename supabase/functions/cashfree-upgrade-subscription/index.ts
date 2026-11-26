@@ -1,7 +1,7 @@
 // Upgrades an active monthly Mentorle Plus membership to yearly:
 // cancels the current Cashfree subscription, ends the old membership, then starts
 // a new yearly pending membership + Cashfree subscription session (same checkout flow).
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.0";
+import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

@@ -1,6 +1,6 @@
 // Cancels a member's Cashfree subscription (stops auto-renew) and marks the membership cancelled.
 // Cashfree manage endpoint: POST /pg/subscriptions/{subscription_id}/manage { action: "CANCEL" }.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.0";
+import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

@@ -17,6 +17,9 @@ import {
   useMentorEarnings,
   useMyWithdrawals,
   useMyPayoutAccount,
+  earningTotals,
+  EARNING_STATUS_LABEL,
+  EARNING_STATUS_VARIANT,
   earningsKey,
   withdrawalsKey,
   payoutAccountKey,
@@ -37,7 +40,12 @@ const SOURCE_LABEL: Record<string, string> = {
   adjustment: "Adjustment",
 };
 
-const inr = (n: number) => `₹${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+// Whole rupees without decimals (₹500); otherwise always two places (₹3,773.70, not ₹3,773.7).
+const inr = (n: number) => {
+  const value = Math.abs(Number(n));
+  const paise = value % 1 !== 0;
+  return `${Number(n) < 0 ? "−" : ""}₹${value.toLocaleString("en-IN", { minimumFractionDigits: paise ? 2 : 0, maximumFractionDigits: 2 })}`;
+};
 
 const formatAccount = (d?: Record<string, string> | null) => {
   if (!d) return "—";
@@ -61,7 +69,7 @@ const MentorEarningsDetail = ({ mentor }: { mentor: MentorRow }) => {
   const [earnPage, setEarnPage] = useState(0);
   const [wdPage, setWdPage] = useState(0);
 
-  const available = earnings.filter((e) => e.status === "accrued").reduce((s, e) => s + e.net_amount, 0);
+  const { available, onHold } = earningTotals(earnings);
   const pending = withdrawals
     .filter((w) => w.status === "requested" || w.status === "approved")
     .reduce((s, w) => s + w.amount, 0);
@@ -76,10 +84,17 @@ const MentorEarningsDetail = ({ mentor }: { mentor: MentorRow }) => {
 
   return (
     <>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2"><CardDescription>Available to withdraw</CardDescription></CardHeader>
           <CardContent><p className="text-2xl font-semibold">{inr(available)}</p></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardDescription>On hold</CardDescription></CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold">{inr(onHold)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Released when the session is completed or the event ends.</p>
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardDescription>Pending payout</CardDescription></CardHeader>
@@ -135,9 +150,9 @@ const MentorEarningsDetail = ({ mentor }: { mentor: MentorRow }) => {
                         <TableCell>{format(new Date(e.created_at), "d MMM yyyy")}</TableCell>
                         <TableCell>{SOURCE_LABEL[e.source] ?? e.source}</TableCell>
                         <TableCell className="text-right">{inr(e.gross_amount)}</TableCell>
-                        <TableCell className="text-right text-muted-foreground">−{inr(e.fee_amount)}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{e.fee_amount < 0 ? "+" : "−"}{inr(Math.abs(e.fee_amount))}</TableCell>
                         <TableCell className="text-right font-medium">{inr(e.net_amount)}</TableCell>
-                        <TableCell><Badge variant="secondary" className="capitalize">{e.status}</Badge></TableCell>
+                        <TableCell><Badge variant={EARNING_STATUS_VARIANT[e.status] ?? "secondary"}>{EARNING_STATUS_LABEL[e.status] ?? e.status}</Badge></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

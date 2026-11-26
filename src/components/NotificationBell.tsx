@@ -124,6 +124,7 @@ const TYPE_STYLES: Record<string, NotifStyle> = {
 
 const NOTIF_ROUTES: Record<string, string> = {
   action_item_assigned: "/mentee/tasks",
+  speaker_request: "/admin/speaker-requests",
 };
 
 const DEFAULT_STYLE: NotifStyle = {

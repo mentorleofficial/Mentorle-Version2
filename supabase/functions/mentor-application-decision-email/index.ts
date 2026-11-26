@@ -1,7 +1,7 @@
 // Sends mentor application decision emails (approved/rejected/changes_requested) via Brevo.
 // Called from the admin flow after a decision is recorded.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

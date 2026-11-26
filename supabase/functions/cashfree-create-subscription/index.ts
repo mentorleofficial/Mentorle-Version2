@@ -4,7 +4,7 @@
 // plan_max_amount is the mandate ceiling (headroom) so prices can be raised for active members
 // later without re-auth, up to that ceiling. Records a `pending` membership; the subscription
 // webhook flips it to `active` once the customer approves the mandate.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.0";
+import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
