@@ -36,7 +36,12 @@ const SOURCE_LABEL: Record<string, string> = {
   adjustment: "Adjustment",
 };
 
-const inr = (n: number) => `${Number(n) < 0 ? "−" : ""}₹${Math.abs(Number(n)).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+// Whole rupees without decimals (₹500); otherwise always two places (₹3,773.70, not ₹3,773.7).
+const inr = (n: number) => {
+  const value = Math.abs(Number(n));
+  const paise = value % 1 !== 0;
+  return `${Number(n) < 0 ? "−" : ""}₹${value.toLocaleString("en-IN", { minimumFractionDigits: paise ? 2 : 0, maximumFractionDigits: 2 })}`;
+};
 
 const EARN_PER_PAGE = 10;
 const WD_PER_PAGE = 5;
